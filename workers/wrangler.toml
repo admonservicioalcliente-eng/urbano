@@ -1,0 +1,16 @@
+name = "nassau-api"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FRONTEND_URL = "https://nassau-admin.pages.dev"
+
+# Secrets (run these commands in PowerShell from the workers/ folder):
+# wrangler secret put DATABASE_URL       <- Neon.tech connection string
+# wrangler secret put JWT_SECRET         <- Random long string, e.g. openssl rand -hex 32
+# wrangler secret put TURNSTILE_SECRET_KEY <- From Cloudflare Turnstile dashboard
+
+[triggers]
+# Runs at 6:00 AM UTC on days 1-5 of each month (generates monthly quotas)
+crons = ["0 6 1-5 * *"]
