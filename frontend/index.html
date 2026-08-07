@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nassau P.H. - Administración</title>
+    
+    <!-- PWA Meta tags -->
+    <meta name="theme-color" content="#f59e0b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/logo.jpg">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="/css/main.css">
+    
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+    <!-- Loading Spinner -->
+    <div id="app-loading">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Notificación</div>
+
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="login-card">
+            <img src="/assets/logo.jpg" alt="Logo" class="login-logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCI+PGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiMzMzMiLz48L3N2Zz4='">
+            <h2>Nassau P.H.</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Urbanización</label>
+                    <select id="login-urb" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="login-password" required>
+                </div>
+                <div class="form-group">
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAAK-placeholder"></div>
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%;">Iniciar Sesión</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Shell -->
+    <div id="app-shell">
+        <nav class="sidebar">
+            <div class="brand">
+                <div class="login-logo" style="width:40px; height:40px; margin-bottom:0;">
+                    <img src="/assets/logo.jpg" alt="Logo" style="width:100%; border-radius:50%;" onerror="this.style.display='none'">
+                </div>
+                NASSAU P.H.
+            </div>
+            <div class="nav-menu">
+                <a href="#" class="nav-link" data-page="dashboard">Dashboard</a>
+                <a href="#" class="nav-link" data-page="propietarios">Propietarios</a>
+                <a href="#" class="nav-link" data-page="pagos">Pagos</a>
+                <a href="#" class="nav-link" data-page="estados">Estado Cuenta</a>
+                <a href="#" class="nav-link" data-page="cobros">Cuentas Cobro</a>
+                <a href="#" class="nav-link" data-page="config">Configuración</a>
+                <a href="#" class="nav-link" data-page="superadmin" style="display:none; color:var(--accent);">SuperAdmin</a>
+            </div>
+            <div class="user-info">
+                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;" id="user-info-name">Usuario</div>
+                <a href="#" class="nav-link" data-page="logout" style="padding:0.3rem;">Salir</a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <button id="mobile-menu-btn">☰</button>
+            
+            <div id="page-dashboard" class="page"></div>
+            <div id="page-propietarios" class="page"></div>
+            <div id="page-pagos" class="page"></div>
+            <div id="page-estados" class="page"></div>
+            <div id="page-cobros" class="page"></div>
+            <div id="page-config" class="page"></div>
+            <div id="page-superadmin" class="page"></div>
+        </main>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-overlay">
+        <div id="modal-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/modules/propietarios.js"></script>
+    <script src="/js/modules/pagos.js"></script>
+    <script src="/js/modules/estados.js"></script>
+    <script src="/js/modules/documentos.js"></script>
+    <script src="/js/modules/configuracion.js"></script>
+    <script src="/js/modules/superadmin.js"></script>
+    <script src="/js/app.js"></script>
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
+</body>
+</html>

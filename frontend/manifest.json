@@ -1,0 +1,12 @@
+{
+  "name": "Nassau P.H. - Administración",
+  "short_name": "Nassau",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#f59e0b",
+  "icons": [
+    { "src": "assets/logo.jpg", "sizes": "192x192", "type": "image/jpeg" },
+    { "src": "assets/logo.jpg", "sizes": "512x512", "type": "image/jpeg" }
+  ]
+}
