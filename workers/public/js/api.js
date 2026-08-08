@@ -10,9 +10,9 @@ window.NassauAPI = {
             window.NassauAuth?.logout();
             throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
         }
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || data.error || 'API Request Failed');
-        return data;
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.message || json.error || 'API Request Failed');
+        return json.ok !== undefined ? json.data : json;
     },
     apiGet(path) { return this.request(path, { method: 'GET' }); },
     apiPost(path, body) { return this.request(path, { method: 'POST', body: JSON.stringify(body) }); },
