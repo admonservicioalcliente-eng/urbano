@@ -13,8 +13,8 @@ export async function handleLogin(request, env) {
   const { email, password, cf_token } = body;
   if (!email || !password) return err(400, 'Email y contraseña requeridos');
 
-  // ── Turnstile verification ──────────────────────────────────────────────────
-  if (env.TURNSTILE_SECRET_KEY && cf_token) {
+  // ── Turnstile verification (optional) ──────────────────────────────────────
+  if (env.TURNSTILE_SECRET_KEY && cf_token && cf_token !== 'dummy_token') {
     const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
