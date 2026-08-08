@@ -15,7 +15,11 @@ window.NassauAuth = {
         try {
             const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
             const select = document.getElementById('login-urb');
-            if(select) select.innerHTML = urbs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+            if(select && urbs.length) {
+                select.innerHTML = urbs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+            } else if(select) {
+                select.innerHTML = '<option value="">No hay urbanizaciones</option>';
+            }
         } catch (e) { console.error('Failed to load urbanizaciones', e); }
     },
     async login(email, password, urb_id, cf_token) {
