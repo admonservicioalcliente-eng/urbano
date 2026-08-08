@@ -7,14 +7,15 @@ compatibility_flags = ["nodejs_compat"]
 binding = "HYPERDRIVE"
 id = "e1922df6766344b2be62c30171bf0426"
 
-[vars]
-FRONTEND_URL = "https://nassau-admin.pages.dev"
+[observability]
+enabled = true
 
-# Secrets (run these commands in PowerShell from the workers/ folder):
-# wrangler secret put DATABASE_URL       <- Neon.tech connection string
-# wrangler secret put JWT_SECRET         <- Random long string, e.g. openssl rand -hex 32
-# wrangler secret put TURNSTILE_SECRET_KEY <- From Cloudflare Turnstile dashboard
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+[vars]
+FRONTEND_URL = "https://nassau-api.policomputo.workers.dev"
 
 [triggers]
-# Runs at 6:00 AM UTC on days 1-5 of each month (generates monthly quotas)
 crons = ["0 6 1-5 * *"]

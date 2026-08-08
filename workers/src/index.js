@@ -40,6 +40,17 @@ export default {
         return res;
       }
 
+      // Public: urbanizaciones for login page
+      if (path === '/api/urbanizaciones' && method === 'GET') {
+        try {
+          const { query } = await import('./db.js');
+          const rows = await query(env, 'SELECT id, nombre FROM urbanizaciones WHERE estado = $1', ['admitida']);
+          return jsonResponse(rows, 200, env);
+        } catch (err) {
+          return jsonResponse([], 200, env);
+        }
+      }
+
       // Protected routes
       const auth = await authMiddleware(request, env);
       if (auth.error) {
@@ -89,6 +100,9 @@ export default {
         else if (method === 'PUT' && resourceId && subAction === 'estado') res = await superadminHandler.handleUpdateEstado(request, env, user, resourceId);
       } else if (path === '/api/admin/stats' && method === 'GET') {
         res = await superadminHandler.handleGetStats(request, env, user);
+      } else if (!path.startsWith('/api/')) {
+        // Serve static assets for non-API routes
+        return env.ASSETS.fetch(request);
       } else {
         return errorResponse('Route not found', 404, env);
       }
