@@ -1,15 +1,20 @@
-// db.js — Neon PostgreSQL connection (edge-compatible via HTTP/WebSocket)
-import { neon } from '@neondatabase/serverless';
+// db.js — PostgreSQL connection via Cloudflare Hyperdrive (using postgres.js)
+import postgres from 'postgres';
+
+let sql;
 
 /**
- * Returns a tagged-template SQL executor bound to the DATABASE_URL secret.
- * Usage: const sql = getDB(env); const rows = await sql`SELECT * FROM propietarios`;
+ * Returns a postgres.js client connected via Hyperdrive.
  */
-export function getDB(env) {
-  if (!env.DATABASE_URL) {
-    throw new Error('DATABASE_URL secret is not configured. Run: wrangler secret put DATABASE_URL');
+function getClient(env) {
+  const connectionString = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('HYPERDRIVE or DATABASE_URL is not configured');
   }
-  return neon(env.DATABASE_URL);
+  if (!sql) {
+    sql = postgres(connectionString, { ssl: 'require' });
+  }
+  return sql;
 }
 
 /**
@@ -20,9 +25,7 @@ export function getDB(env) {
  * @returns {Promise<Array>} Result rows
  */
 export async function query(env, sqlText, params = []) {
-  const sql = getDB(env);
-  // neon() tagged template doesn't support raw strings directly,
-  // so we use neon(url) with the query method pattern
-  const db = neon(env.DATABASE_URL);
-  return await db(sqlText, params);
+  const client = getClient(env);
+  const result = await client.unsafe(sqlText, params);
+  return result;
 }
