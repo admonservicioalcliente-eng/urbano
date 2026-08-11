@@ -66,8 +66,9 @@ window.NassauEstados = {
         contentDiv.style.display = 'block';
         try {
             window.NassauApp.showLoading(true);
-            const data = await window.NassauAPI.apiGet(`/estados?propietario_id=${propId}&anio=${anio}`);
-            let totalDeuda = 0, saldoFavor = 0, mesesPendientes = 0;
+            const resp = await window.NassauAPI.apiGet(`/estados?propietario_id=${propId}&anio=${anio}`);
+            const data = Array.isArray(resp) ? resp : (resp?.estados || []);
+            const t = (!Array.isArray(resp) && resp?.totales) ? resp.totales : null;
             const tbody = document.querySelector('#estados-table tbody');
             if(!data || data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center">No hay registros para este a\u00f1o</td></tr>';
@@ -75,8 +76,6 @@ window.NassauEstados = {
                 const mesNames = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
                 tbody.innerHTML = data.map(e => {
                     const deudaMes = Number(e.total_deuda || 0);
-                    if(!e.cerrado && deudaMes > 0) { totalDeuda += deudaMes; mesesPendientes++; }
-                    if(Number(e.saldo_favor) > 0) saldoFavor += Number(e.saldo_favor);
                     const badge = e.cerrado ? 'activo' : (deudaMes > 0 ? 'moroso' : 'inactivo');
                     const estadoLabel = e.cerrado ? 'Cerrado' : (deudaMes > 0 ? 'Pendiente' : 'Al d\u00eda');
                     return `
@@ -92,6 +91,11 @@ window.NassauEstados = {
                     </tr>`;
                 }).join('');
             }
+            // Totales reales del propietario (todos los meses + abonos del mes
+            // actual aplicados a la deuda más antigua)
+            const totalDeuda = t ? Number(t.total_deuda_actual || 0) : data.reduce((s,e) => (!e.cerrado && Number(e.total_deuda) > 0) ? s + Number(e.total_deuda) : s, 0);
+            const saldoFavor = t ? Number(t.total_saldo_favor || 0) : data.reduce((s,e) => Number(e.saldo_favor) > 0 ? s + Number(e.saldo_favor) : s, 0);
+            const mesesPendientes = t ? Number(t.meses_pendientes || 0) : data.filter(e => !e.cerrado && Number(e.total_deuda) > 0).length;
             document.getElementById('estado-summary').innerHTML = `
                 <div class="stat-card"><div class="stat-icon" style="color:var(--error)">$</div><div class="stat-value">$${totalDeuda.toLocaleString()}</div><div class="stat-label">Total Deuda Actual</div></div>
                 <div class="stat-card"><div class="stat-icon" style="color:var(--success)">+</div><div class="stat-value">$${saldoFavor.toLocaleString()}</div><div class="stat-label">Total Pagado Aplicado</div></div>

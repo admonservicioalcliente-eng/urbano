@@ -74,57 +74,46 @@ export async function handleCreate(request, env, user) {
     comprobanteGenerado = `NAS-0001`;
   }
 
-  // Si no se indicó estado de cuenta, asociar al estado del MISMO MES de la
-  // fecha de pago (los abonos son registros del mismo mes); si no existe, al
-  // abierto más antiguo; si no hay ninguno, crear el del mes de la fecha.
+  // Si no se indicó estado de cuenta, asociar al abierto más antiguo
+  // (el abono se aplica a la deuda más antigua) o crear el del mes de la fecha
   let estadoCuentaId = estado_cuenta_id || null;
   if (!estadoCuentaId) {
-    const pagoDate = new Date(fecha_pago);
-    const anioP = pagoDate.getFullYear();
-    const mesP = pagoDate.getMonth() + 1;
-
-    const sameMonthRows = await query(env,
+    const openRows = await query(env,
       `SELECT id FROM estados_cuenta
-       WHERE propietario_id = $1 AND anio = $2 AND mes = $3
-       ORDER BY id LIMIT 1`,
-      [propietario_id, anioP, mesP]
+       WHERE propietario_id = $1 AND cerrado = false
+       ORDER BY anio ASC, mes ASC LIMIT 1`,
+      [propietario_id]
     );
-    if (sameMonthRows.length) {
-      estadoCuentaId = sameMonthRows[0].id;
+    if (openRows.length) {
+      estadoCuentaId = openRows[0].id;
     } else {
-      const openRows = await query(env,
-        `SELECT id FROM estados_cuenta
-         WHERE propietario_id = $1 AND cerrado = false
-         ORDER BY anio ASC, mes ASC LIMIT 1`,
-        [propietario_id]
-      );
-      if (openRows.length) {
-        estadoCuentaId = openRows[0].id;
-      } else {
-        const cuotaProp = parseFloat(propRows[0].cuota_admon) || 0;
-        const paramCuota = await query(env,
-          `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id = $1 AND anio = $2`,
-          [user.urbanizacion_id, anioP]
-        );
-        const cuotaMes = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
-          ? parseFloat(paramCuota[0].cuota_admon) : cuotaProp;
+      const pagoDate = new Date(fecha_pago);
+      const anioP = pagoDate.getFullYear();
+      const mesP = pagoDate.getMonth() + 1;
 
-        const created = await query(env,
-          `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
-           VALUES ($1, $2, $3, $4, $5, 0, 0, $6)
-           ON CONFLICT (propietario_id, anio, mes) DO NOTHING
-           RETURNING id`,
-          [propietario_id, anioP, mesP, cuotaMes, 0, null]
+      const cuotaProp = parseFloat(propRows[0].cuota_admon) || 0;
+      const paramCuota = await query(env,
+        `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id = $1 AND anio = $2`,
+        [user.urbanizacion_id, anioP]
+      );
+      const cuotaMes = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
+        ? parseFloat(paramCuota[0].cuota_admon) : cuotaProp;
+
+      const created = await query(env,
+        `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+         VALUES ($1, $2, $3, $4, $5, 0, 0, $6)
+         ON CONFLICT (propietario_id, anio, mes) DO NOTHING
+         RETURNING id`,
+        [propietario_id, anioP, mesP, cuotaMes, 0, null]
+      );
+      if (created.length) {
+        estadoCuentaId = created[0].id;
+      } else {
+        const existing = await query(env,
+          `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
+          [propietario_id, anioP, mesP]
         );
-        if (created.length) {
-          estadoCuentaId = created[0].id;
-        } else {
-          const existing = await query(env,
-            `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
-            [propietario_id, anioP, mesP]
-          );
-          if (existing.length) estadoCuentaId = existing[0].id;
-        }
+        if (existing.length) estadoCuentaId = existing[0].id;
       }
     }
   }

@@ -13,56 +13,44 @@ async function conciliarPagos(env, propietarioId) {
   );
 
   for (const pg of unlinked) {
-    const fd = new Date(pg.fecha_pago);
-    const anioP = fd.getFullYear();
-    const mesP = fd.getMonth() + 1;
-
-    // Preferir el estado del MISMO MES de la fecha del pago (los abonos son
-    // registros del mismo mes); si no existe, el abierto más antiguo.
-    const sameMonthRows = await query(env,
+    // El pago se aplica a la deuda más antigua (FIFO)
+    const openRows = await query(env,
       `SELECT id FROM estados_cuenta
-       WHERE propietario_id = $1 AND anio = $2 AND mes = $3
-       ORDER BY id LIMIT 1`,
-      [propietarioId, anioP, mesP]
+       WHERE propietario_id = $1 AND cerrado = false
+       ORDER BY anio ASC, mes ASC LIMIT 1`,
+      [propietarioId]
     );
     let ecId;
-    if (sameMonthRows.length) {
-      ecId = sameMonthRows[0].id;
+    if (openRows.length) {
+      ecId = openRows[0].id;
     } else {
-      const openRows = await query(env,
-        `SELECT id FROM estados_cuenta
-         WHERE propietario_id = $1 AND cerrado = false
-         ORDER BY anio ASC, mes ASC LIMIT 1`,
-        [propietarioId]
+      const fd = new Date(pg.fecha_pago);
+      const anioP = fd.getFullYear();
+      const mesP = fd.getMonth() + 1;
+      const propRow = await query(env, `SELECT cuota_admon, urbanizacion_id FROM propietarios WHERE id = $1`, [propietarioId]);
+      const paramCuota = await query(env,
+        `SELECT cuota_admon FROM parametros_anio
+         WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
+        [propRow[0].urbanizacion_id, anioP]
       );
-      if (openRows.length) {
-        ecId = openRows[0].id;
-      } else {
-        const propRow = await query(env, `SELECT cuota_admon, urbanizacion_id FROM propietarios WHERE id = $1`, [propietarioId]);
-        const paramCuota = await query(env,
-          `SELECT cuota_admon FROM parametros_anio
-           WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
-          [propRow[0].urbanizacion_id, anioP]
-        );
-        const cuota = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
-          ? parseFloat(paramCuota[0].cuota_admon) : (parseFloat(propRow[0].cuota_admon) || 0);
+      const cuota = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
+        ? parseFloat(paramCuota[0].cuota_admon) : (parseFloat(propRow[0].cuota_admon) || 0);
 
-        const created = await query(env,
-          `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
-           VALUES ($1, $2, $3, $4, 0, 0, 0, $5)
-           ON CONFLICT (propietario_id, anio, mes) DO NOTHING
-           RETURNING id`,
-          [propietarioId, anioP, mesP, cuota, null]
+      const created = await query(env,
+        `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+         VALUES ($1, $2, $3, $4, 0, 0, 0, $5)
+         ON CONFLICT (propietario_id, anio, mes) DO NOTHING
+         RETURNING id`,
+        [propietarioId, anioP, mesP, cuota, null]
+      );
+      if (created.length) {
+        ecId = created[0].id;
+      } else {
+        const existing = await query(env,
+          `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
+          [propietarioId, anioP, mesP]
         );
-        if (created.length) {
-          ecId = created[0].id;
-        } else {
-          const existing = await query(env,
-            `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
-            [propietarioId, anioP, mesP]
-          );
-          if (existing.length) ecId = existing[0].id;
-        }
+        if (existing.length) ecId = existing[0].id;
       }
     }
     if (ecId) {
@@ -116,12 +104,11 @@ export async function handleGetByPropietario(request, env, user) {
     [propId, parseInt(anio)]
   );
 
-  // Si se consulta el año actual y el propietario está activo pero aún no se le
-  // ha generado el estado de cuenta del mes en curso (sin cuenta de cobro del
-  // mes), la cuota de administración de ese mes se considera deuda vigente.
+  // Mes en curso: si no existe su estado, se considera deuda vigente
   const hoy = new Date();
   const anioActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
+  let virtualMesActual = false;
 
   if (parseInt(anio) === anioActual && propRows[0].estado !== 'inactivo') {
     const yaTieneMes = estados.some(e => parseInt(e.mes) === mesActual);
@@ -135,6 +122,7 @@ export async function handleGetByPropietario(request, env, user) {
         ? parseFloat(params[0].cuota_admon)
         : (parseFloat(propRows[0].cuota_admon) || 0);
 
+      virtualMesActual = true;
       estados.push({
         id: null,
         propietario_id: propId,
@@ -154,18 +142,32 @@ export async function handleGetByPropietario(request, env, user) {
     }
   }
 
-  // Totales generales acumulados del propietario
+  // Totales reales de TODOS los estados del propietario (todos los años):
+  // cargos causados mes a mes MENOS los abonos/pagos aplicados (los abonos del
+  // mes actual se aplican a la deuda más antigua y se descuentan del total).
   const totals = await query(env,
-    `SELECT 
-      COALESCE(SUM(total_deuda), 0) AS total_deuda,
-      COALESCE(SUM(saldo_favor), 0) AS total_saldo_favor,
-      COUNT(CASE WHEN total_deuda > 0 AND cerrado = false THEN 1 END) AS meses_pendientes
+    `SELECT
+       COALESCE(SUM(pago_actual + saldo_anterior + intereses), 0) AS total_cargos,
+       COALESCE(SUM(saldo_favor), 0) AS total_saldo_favor,
+       COUNT(CASE WHEN cerrado = false AND total_deuda > 0 THEN 1 END) AS meses_pendientes
      FROM estados_cuenta
      WHERE propietario_id = $1`,
     [propId]
   );
+  let totalCargos = parseFloat(totals[0].total_cargos) || 0;
+  if (virtualMesActual) totalCargos += parseFloat(estados[estados.length - 1].pago_actual) || 0;
+  const totalSaldoFavor = parseFloat(totals[0].total_saldo_favor) || 0;
+  const totalDeudaActual = Math.max(0, Math.round((totalCargos - totalSaldoFavor) * 100) / 100);
+  const mesesPendientes = parseInt(totals[0].meses_pendientes) || 0;
 
-  return ok(estados);
+  return ok({
+    estados,
+    totales: {
+      total_deuda_actual: totalDeudaActual,
+      total_saldo_favor: totalSaldoFavor,
+      meses_pendientes: virtualMesActual ? mesesPendientes + 1 : mesesPendientes
+    }
+  });
 }
 
 export async function handleUpdateIntereses(request, env, user) {
@@ -222,9 +224,9 @@ export async function handleGetDashboard(request, env, user) {
     [urbId, mesActual, anioActual]
   );
 
-  // 3. Deuda total acumulada en la urbanización
+  // 3. Deuda total acumulada en la urbanización (cargos netos menos pagos)
   const deuda = await query(env,
-    `SELECT COALESCE(SUM(ec.total_deuda) - SUM(ec.saldo_favor), 0) AS deuda_neta
+    `SELECT COALESCE(SUM(ec.pago_actual + ec.saldo_anterior + ec.intereses - ec.saldo_favor), 0) AS deuda_neta
      FROM estados_cuenta ec
      JOIN propietarios p ON p.id = ec.propietario_id
      WHERE p.urbanizacion_id = $1 AND ec.cerrado = false`,
