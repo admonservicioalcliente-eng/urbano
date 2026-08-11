@@ -200,9 +200,9 @@ export async function handleCreate(request, env, user) {
       total: Math.round(totalDeuda * 100) / 100
     },
     cuenta_bancaria: {
-      banco: 'BANCOLOMBIA',
-      tipo: 'Ahorros',
-      numero: '106-251007-73',
+      banco: 'NEQUI',
+      tipo: 'Cuenta',
+      numero: '3002272559',
       titular: 'PAULA ANDREA HERRERA CANO'
     },
     celular: '324 502 52 01 - 311 392 60 86',

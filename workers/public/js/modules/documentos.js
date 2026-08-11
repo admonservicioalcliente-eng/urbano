@@ -92,43 +92,43 @@ window.NassauDocumentos = {
         doc.setTextColor(0, 0, 0);
 
         const drawCopy = (b, label) => {
-            // LOGO + encabezado urbanización
+            // LOGO + encabezado urbanización (compacto)
             if (logo) {
-                try { doc.addImage(logo, 'JPEG', M, b, 18, 18); } catch(e) { console.warn('Logo no válido', e); }
+                try { doc.addImage(logo, 'JPEG', M, b, 16, 16); } catch(e) { console.warn('Logo no válido', e); }
             }
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-            doc.text(urb.nombre || 'EDIFICIO NASSAU P.H.', M + 22, b + 6);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+            doc.text(urb.nombre || 'EDIFICIO NASSAU P.H.', M + 20, b + 5);
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-            if (urb.direccion) doc.text(urb.direccion, M + 22, b + 11);
+            if (urb.direccion) doc.text(urb.direccion, M + 20, b + 9);
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-            doc.text('CUENTA DE COBRO', M + 22, b + 16);
+            doc.text('CUENTA DE COBRO', M + 20, b + 13);
 
             // N° documento + fecha generación (derecha)
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(200, 0, 0);
-            doc.text(`No: ${data.codigo || data.codigo_doc || 'NAS-000'}`, RIGHT, b + 6, { align: 'right' });
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(200, 0, 0);
+            doc.text(`No: ${data.codigo || data.codigo_doc || 'NAS-000'}`, RIGHT, b + 5, { align: 'right' });
             doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
             const fechaGen = data.fecha_emision || data.fecha_generacion || Date.now();
-            doc.text(`Fecha de generación: ${new Date(fechaGen).toLocaleDateString()}`, RIGHT, b + 11, { align: 'right' });
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 150, 150);
-            doc.text(label, RIGHT, b + 16, { align: 'right' });
+            doc.text(`Fecha de generación: ${new Date(fechaGen).toLocaleDateString()}`, RIGHT, b + 9, { align: 'right' });
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 150, 150);
+            doc.text(label, RIGHT, b + 13, { align: 'right' });
             doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
 
-            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4); doc.line(M, b + 22, RIGHT, b + 22);
+            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4); doc.line(M, b + 18, RIGHT, b + 18);
 
             // Destinatario
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.text('Señor(a):', M, b + 28);
-            doc.setFont('helvetica', 'normal'); doc.text(data.propietario_nombre || data.nombre_propietario || prop.nombre || '', M + 26, b + 28);
-            doc.setFont('helvetica', 'bold'); doc.text('Apartamento:', M, b + 33);
-            doc.setFont('helvetica', 'normal'); doc.text(data.propietario_apto || data.apartamento || prop.apartamento || '', M + 26, b + 33);
-            doc.line(M, b + 36, RIGHT, b + 36);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text('Señor(a):', M, b + 23);
+            doc.setFont('helvetica', 'normal'); doc.text(data.propietario_nombre || data.nombre_propietario || prop.nombre || '', M + 24, b + 23);
+            doc.setFont('helvetica', 'bold'); doc.text('Apartamento:', M, b + 27);
+            doc.setFont('helvetica', 'normal'); doc.text(data.propietario_apto || data.apartamento || prop.apartamento || '', M + 24, b + 27);
+            doc.line(M, b + 30, RIGHT, b + 30);
 
             // Cabecera de conceptos
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-            doc.text('CONCEPTO', M, b + 42); doc.text('VALOR', RIGHT - 12, b + 42, { align: 'right' });
-            doc.line(M, b + 44, RIGHT, b + 44);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+            doc.text('CONCEPTO', M, b + 34.5); doc.text('VALOR', RIGHT - 12, b + 34.5, { align: 'right' });
+            doc.line(M, b + 36.5, RIGHT, b + 36.5);
 
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-            let y = b + 49;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+            let y = b + 40.5;
 
             const rows = [];
 
@@ -166,12 +166,12 @@ window.NassauDocumentos = {
             }
 
             rows.forEach(r => {
-                if (y > b + 115) return; // evita desbordar la mitad
+                if (y > b + 96) return; // evita desbordar la mitad
                 doc.setFont('helvetica', r.bold ? 'bold' : 'normal');
                 const valStr = r.value < 0 ? `-$${Math.abs(r.value).toLocaleString()}` : `$${Math.abs(r.value).toLocaleString()}`;
                 doc.text(r.label, M, y);
                 doc.text(valStr, RIGHT - 12, y, { align: 'right' });
-                y += 5;
+                y += 4.3;
             });
 
             // Saldo a favor neto: cuando el total calculado es negativo
@@ -180,46 +180,46 @@ window.NassauDocumentos = {
 
             doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
             doc.line(RIGHT - 12, y, RIGHT, y);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
 
             if (saldoAFavor > 0) {
                 doc.setTextColor(16, 185, 129); // verde
             }
-            doc.text('TOTAL A PAGAR:', M, y + 4);
-            doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 4, { align: 'right' });
+            doc.text('TOTAL A PAGAR:', M, y + 3.5);
+            doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3.5, { align: 'right' });
             doc.setTextColor(0, 0, 0);
 
             // Si quedó saldo a favor, nota en verde debajo del total
             if (saldoAFavor > 0) {
                 const nombreDest = data.propietario_nombre || data.nombre_propietario || prop.nombre || 'El propietario';
-                doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(8);
+                doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7.5);
                 doc.setTextColor(16, 185, 129);
-                doc.text(`El propietario ${nombreDest} cuenta con un saldo a favor de $${saldoAFavor.toLocaleString()}`, M, y + 10);
+                doc.text(`El propietario ${nombreDest} cuenta con un saldo a favor de $${saldoAFavor.toLocaleString()}`, M, y + 8);
                 doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
             }
 
-            // ── Pie de copia: CONSIGNACIÓN ───────────────────────────────────
-            const yf = Math.max(b + 112, y + (saldoAFavor > 0 ? 16 : 8));
+            // ── Pie de copia: CONSIGNACIÓN (compacto) ─────────────────────────
+            const yf = Math.max(b + 100, y + (saldoAFavor > 0 ? 14 : 7));
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.6); doc.line(M, yf, RIGHT, yf);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
-            doc.text('CONSIGNACIÓN PROVISIONAL', W / 2, yf + 6, { align: 'center' });
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
+            doc.text('CONSIGNACIÓN PROVISIONAL', W / 2, yf + 4.5, { align: 'center' });
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-            doc.text('BANCOLOMBIA cuenta de Ahorros No. 106-251007-73', W / 2, yf + 11, { align: 'center' });
+            doc.text('NEQUI  3002272559', W / 2, yf + 9, { align: 'center' });
             doc.setFont('helvetica', 'bold');
-            doc.text('PAULA ANDREA HERRERA CANO', W / 2, yf + 16, { align: 'center' });
+            doc.text('PAULA ANDREA HERRERA CANO', W / 2, yf + 13.5, { align: 'center' });
             doc.setFont('helvetica', 'normal');
-            doc.text('Cualquier pago favor enviar a: admonednassau@gmail.com o al cel. 300 227 25 58', W / 2, yf + 21, { align: 'center' });
+            doc.text('Cualquier pago favor enviar a: admonednassau@gmail.com o al cel. 300 227 25 58', W / 2, yf + 18, { align: 'center' });
             doc.setTextColor(0, 150, 150); doc.setFont('helvetica', 'bolditalic');
-            doc.text('PAGAR CUMPLIDAMENTE NOS HACE TENER UNA MEJOR CALIDAD DE VIDA', W / 2, yf + 27, { align: 'center' });
-            doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-            doc.setTextColor(150, 150, 150); doc.text('DOCUMENTO PROVISIONAL', W / 2, yf + 32, { align: 'center' }); doc.setTextColor(0, 0, 0);
+            doc.text('PAGAR CUMPLIDAMENTE NOS HACE TENER UNA MEJOR CALIDAD DE VIDA', W / 2, yf + 23, { align: 'center' });
+            doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+            doc.setTextColor(150, 150, 150); doc.text('DOCUMENTO PROVISIONAL', W / 2, yf + 27, { align: 'center' }); doc.setTextColor(0, 0, 0);
         };
 
         // ── Primera copia: ORIGINAL ─────────────────────────────────────────
-        drawCopy(10, 'ORIGINAL');
+        drawCopy(8, 'ORIGINAL');
 
         // ── Segunda copia: COPIA ────────────────────────────────────────────
-        drawCopy(140, 'COPIA');
+        drawCopy(141, 'COPIA');
 
         doc.save(`${data.codigo || data.codigo_doc || 'documento'}.pdf`);
     }
