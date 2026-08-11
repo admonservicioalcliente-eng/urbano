@@ -51,31 +51,98 @@ export async function handleCreate(request, env, user) {
     return err(403, 'Acceso denegado');
   }
 
+  // Auto-generar comprobante
+  const anioPago = new Date(fecha_pago).getFullYear();
+  const paramRows = await query(env,
+    `SELECT prefijo_comprobante, consecutivo_comprobante FROM parametros_anio
+     WHERE urbanizacion_id = $1 AND anio = $2`,
+    [user.urbanizacion_id, anioPago]
+  );
+
+  let comprobanteGenerado;
+  if (paramRows.length) {
+    const param = paramRows[0];
+    const nuevoConsecutivo = (param.consecutivo_comprobante || 0) + 1;
+    comprobanteGenerado = `${param.prefijo_comprobante}-${String(nuevoConsecutivo).padStart(4, '0')}`;
+
+    await query(env,
+      `UPDATE parametros_anio SET consecutivo_comprobante = $1
+       WHERE urbanizacion_id = $2 AND anio = $3`,
+      [nuevoConsecutivo, user.urbanizacion_id, anioPago]
+    );
+  } else {
+    comprobanteGenerado = `NAS-0001`;
+  }
+
+  // Si no se indicó estado de cuenta, asociar al abierto más antiguo
+  // o crear el del mes de la fecha de pago
+  let estadoCuentaId = estado_cuenta_id || null;
+  if (!estadoCuentaId) {
+    const openRows = await query(env,
+      `SELECT id FROM estados_cuenta
+       WHERE propietario_id = $1 AND cerrado = false
+       ORDER BY anio ASC, mes ASC LIMIT 1`,
+      [propietario_id]
+    );
+    if (openRows.length) {
+      estadoCuentaId = openRows[0].id;
+    } else {
+      const pagoDate = new Date(fecha_pago);
+      const anioP = pagoDate.getFullYear();
+      const mesP = pagoDate.getMonth() + 1;
+
+      const cuotaProp = parseFloat(propRows[0].cuota_admon) || 0;
+      const paramCuota = await query(env,
+        `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id = $1 AND anio = $2`,
+        [user.urbanizacion_id, anioP]
+      );
+      const cuotaMes = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
+        ? parseFloat(paramCuota[0].cuota_admon) : cuotaProp;
+
+      const created = await query(env,
+        `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+         VALUES ($1, $2, $3, $4, $5, 0, 0, $6)
+         ON CONFLICT (propietario_id, anio, mes) DO NOTHING
+         RETURNING id`,
+        [propietario_id, anioP, mesP, cuotaMes, 0, null]
+      );
+      if (created.length) {
+        estadoCuentaId = created[0].id;
+      } else {
+        const existing = await query(env,
+          `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
+          [propietario_id, anioP, mesP]
+        );
+        if (existing.length) estadoCuentaId = existing[0].id;
+      }
+    }
+  }
+
   // Insertar pago
   const pRows = await query(env,
     `INSERT INTO pagos (
       propietario_id, estado_cuenta_id, monto, fecha_pago, tipo_pago, comprobante, descripcion, registrado_por
     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-    [propietario_id, estado_cuenta_id, monto, fecha_pago, tipo_pago || 'cuota_regular', comprobante, descripcion, user.id]
+    [propietario_id, estadoCuentaId, monto, fecha_pago, tipo_pago || 'cuota_regular', comprobanteGenerado, descripcion || null, user.id]
   );
 
   const pago = pRows[0];
 
-  // Si se asocia a un estado de cuenta específico, actualizar su distribución
-  if (estado_cuenta_id) {
+  // Si se asocia a un estado de cuenta, actualizar su distribución
+  if (estadoCuentaId) {
     // 1. Obtener estado de cuenta actual
-    const ecRows = await query(env, `SELECT * FROM estados_cuenta WHERE id = $1`, [estado_cuenta_id]);
+    const ecRows = await query(env, `SELECT * FROM estados_cuenta WHERE id = $1`, [estadoCuentaId]);
     if (ecRows.length) {
       const ec = ecRows[0];
       const totalDeudaActual = parseFloat(ec.pago_actual) + parseFloat(ec.saldo_anterior) + parseFloat(ec.intereses);
       
       // 2. Sumar todos los pagos a este estado de cuenta
-      const sumRows = await query(env, `SELECT SUM(monto) as total FROM pagos WHERE estado_cuenta_id = $1`, [estado_cuenta_id]);
+      const sumRows = await query(env, `SELECT SUM(monto) as total FROM pagos WHERE estado_cuenta_id = $1`, [estadoCuentaId]);
       const totalPagado = parseFloat(sumRows[0].total) || 0;
 
       let nuevoSaldoFavor = 0;
-      if (totalPagado > totalDeudaActual) {
-        nuevoSaldoFavor = totalPagado - totalDeudaActual;
+      if (totalPagado > 0) {
+        nuevoSaldoFavor = totalPagado;
       }
 
       // 3. Actualizar el estado de cuenta
@@ -84,7 +151,7 @@ export async function handleCreate(request, env, user) {
           saldo_favor = $1,
           cerrado = CASE WHEN $2 >= $3 THEN true ELSE false END
         WHERE id = $4`,
-        [nuevoSaldoFavor, totalPagado, totalDeudaActual, estado_cuenta_id]
+        [nuevoSaldoFavor, totalPagado, totalDeudaActual, estadoCuentaId]
       );
     }
   }
@@ -135,8 +202,8 @@ export async function handleDelete(request, env, user, id) {
       const totalPagado = parseFloat(sumRows[0].total) || 0;
 
       let nuevoSaldoFavor = 0;
-      if (totalPagado > totalDeudaActual) {
-        nuevoSaldoFavor = totalPagado - totalDeudaActual;
+      if (totalPagado > 0) {
+        nuevoSaldoFavor = totalPagado;
       }
 
       await query(env,

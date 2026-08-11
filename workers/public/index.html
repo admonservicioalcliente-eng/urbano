@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/jpeg" href="/assets/logo.jpg">
     <link rel="apple-touch-icon" href="/assets/logo.jpg">
 
     <!-- CSS -->
@@ -37,7 +38,7 @@
             <form id="login-form">
                 <div class="form-group">
                     <label>Urbanización</label>
-                    <select id="login-urb"></select>
+                    <select id="login-urb" required></select>
                 </div>
                 <div class="form-group">
                     <label>Email</label>
@@ -48,11 +49,49 @@
                     <input type="password" id="login-password" required>
                 </div>
                 <div class="form-group">
-                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAEJxy95MnlU2yWRL"></div>
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAELQEOy0MeUjBBB7"></div>
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%;">Iniciar Sesión</button>
             </form>
+            <div class="login-divider">o</div>
+            <button type="button" id="btn-registro-toggle" class="btn-outline" style="width: 100%;">Registrar nueva urbanización</button>
+            <form id="registro-form" style="display:none; margin-top: 1rem;">
+                <div class="form-group">
+                    <label>Nombre de la urbanización *</label>
+                    <input type="text" id="reg-nombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="reg-direccion">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" id="reg-telefono">
+                </div>
+                <div class="form-group">
+                    <label>Email de contacto</label>
+                    <input type="email" id="reg-email">
+                </div>
+                <div class="form-group">
+                    <label>Prefijo de documentos</label>
+                    <input type="text" id="reg-prefijo" value="NAS" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label>Nombre del administrador *</label>
+                    <input type="text" id="reg-admin-nombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Email de acceso *</label>
+                    <input type="email" id="reg-admin-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Contraseña de acceso (mín. 8 caracteres) *</label>
+                    <input type="password" id="reg-admin-password" required minlength="8">
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%;">Solicitar registro</button>
+            </form>
         </div>
+        <p class="login-footer">¿Es una urbanización nueva? Regístrese y el SUPERADMIN aprobará su acceso.</p>
     </div>
 
     <!-- App Shell -->
@@ -112,6 +151,9 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js');
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    window.location.reload();
+                });
             });
         }
     </script>

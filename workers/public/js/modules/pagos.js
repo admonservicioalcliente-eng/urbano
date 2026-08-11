@@ -41,10 +41,11 @@ window.NassauPagos = {
     async loadPagos(propietarioId) {
         try {
             window.NassauApp.showLoading(true);
-            const pagos = await window.NassauAPI.apiGet(`/pagos?propietario_id=${propietarioId}`);
+            const currentYear = new Date().getFullYear();
+            const pagos = await window.NassauAPI.apiGet(`/pagos?propietario_id=${propietarioId}&anio=${currentYear}`);
             const tbody = document.querySelector('#pagos-table tbody');
             if(pagos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay pagos registrados para este propietario</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center">No hay pagos registrados para este propietario en ${currentYear}</td></tr>`;
                 return;
             }
             tbody.innerHTML = pagos.map(p => `
@@ -63,7 +64,7 @@ window.NassauPagos = {
         if(!propId) return;
         const prop = this.propietariosList.find(p => p.id == propId);
         const html = `
-            <form id="pago-form" onsubmit="window.NassauPagos.registrarPago(event, ${propId})">
+            <form id="pago-form" onsubmit="window.NassauPagos.registrarPago(event, '${propId}')">
                 <p>Registrando pago para: <strong>${prop.apartamento} - ${prop.nombre_propietario}</strong></p>
                 <div class="form-row">
                     <div class="form-group"><label>Monto</label><input type="number" id="pago-monto" required></div>

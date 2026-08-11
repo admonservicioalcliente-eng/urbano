@@ -6,3 +6,7 @@ node_modules/
 dist/
 .DS_Store
 Thumbs.db
+
+# Test scripts with credentials
+workers/migrate.js
+workers/test-pago.js

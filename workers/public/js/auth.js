@@ -17,6 +17,7 @@ window.NassauAuth = {
             const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
             if(select && Array.isArray(urbs) && urbs.length) {
                 select.innerHTML = urbs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+                if (urbs.length === 1) select.value = urbs[0].id;
             } else throw new Error('empty');
         } catch (e) {
             if(select) select.innerHTML = '<option value="a1b2c3d4-0001-0001-0001-000000000001">Edificio Nassau P.H.</option>';
@@ -37,8 +38,7 @@ window.NassauAuth = {
         localStorage.removeItem('nassau_token');
         localStorage.removeItem('nassau_urb_id');
         this.renderLoginPage();
-    },
-    isLoggedIn() {
+    },    isLoggedIn() {
         const token = localStorage.getItem('nassau_token');
         if (!token) return false;
         try {
@@ -75,4 +75,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const cf_token = document.querySelector('[name="cf-turnstile-response"]')?.value || 'dummy_token';
         window.NassauAuth.login(email, password, urb_id, cf_token);
     });
+
+    const regToggle = document.getElementById('btn-registro-toggle');
+    const regForm = document.getElementById('registro-form');
+    if (regToggle && regForm) {
+        regToggle.addEventListener('click', () => {
+            const hidden = regForm.style.display === 'none';
+            regForm.style.display = hidden ? 'block' : 'none';
+            regToggle.textContent = hidden ? 'Ocultar formulario de registro' : 'Registrar nueva urbanización';
+        });
+        regForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                window.NassauApp?.showLoading(true);
+                await window.NassauAPI.apiPost('/registro-urbanizacion', {
+                    nombre: document.getElementById('reg-nombre').value,
+                    direccion: document.getElementById('reg-direccion').value,
+                    telefono: document.getElementById('reg-telefono').value,
+                    email: document.getElementById('reg-email').value,
+                    prefijo_doc: document.getElementById('reg-prefijo').value,
+                    admin_nombre: document.getElementById('reg-admin-nombre').value,
+                    admin_email: document.getElementById('reg-admin-email').value,
+                    admin_password: document.getElementById('reg-admin-password').value
+                });
+                window.NassauApp?.showToast('Registro solicitado. El SUPERADMIN aprobará su urbanización y podrá iniciar sesión.', 'success');
+                regForm.reset();
+                regForm.style.display = 'none';
+                regToggle.textContent = 'Registrar nueva urbanización';
+            } catch (error) {
+                window.NassauApp?.showToast(error.message, 'error');
+            } finally {
+                window.NassauApp?.showLoading(false);
+            }
+        });
+    }
 });

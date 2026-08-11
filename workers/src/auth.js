@@ -1,5 +1,7 @@
 // auth.js — JWT + Password hashing using Web Crypto API (edge-compatible)
 
+import { query } from './db.js';
+
 // ─── JWT Helpers ─────────────────────────────────────────────────────────────
 
 function base64urlEncode(str) {
@@ -108,6 +110,7 @@ export async function verifyPassword(password, storedHash) {
 
 /**
  * Extracts and verifies the Bearer token from an incoming request.
+ * Also checks the DB: the account must remain active and not expired.
  * Returns { user, error }.
  */
 export async function authMiddleware(request, env) {
@@ -118,8 +121,22 @@ export async function authMiddleware(request, env) {
   const token = authHeader.slice(7);
   try {
     const user = await verifyToken(token, env.JWT_SECRET);
-    return { user, error: null };
+    const rows = await query(env,
+      `SELECT id, nombre, email, rol, urbanizacion_id, activo, fecha_expiracion
+       FROM usuarios WHERE id = $1 LIMIT 1`,
+      [user.id]
+    );
+    if (!rows.length) return { user: null, error: 'Cuenta no encontrada', status: 401 };
+    const u = rows[0];
+    if (!u.activo) return { user: null, error: 'Cuenta revocada por el administrador', status: 403 };
+    if (u.fecha_expiracion && new Date(u.fecha_expiracion) < new Date()) {
+      return { user: null, error: 'Registro vencido. Contacte al administrador.', status: 403 };
+    }
+    if (u.rol !== user.rol) {
+      return { user: null, error: 'Credenciales obsoletas. Inicie sesión nuevamente.', status: 401 };
+    }
+    return { user: u, error: null };
   } catch (err) {
-    return { user: null, error: err.message };
+    return { user: null, error: err.message, status: 401 };
   }
 }

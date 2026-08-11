@@ -18,4 +18,4 @@ binding = "ASSETS"
 FRONTEND_URL = "https://nassau-api.policomputo.workers.dev"
 
 [triggers]
-crons = ["0 6 1-5 * *"]
+crons = ["0 6 1 * *"]

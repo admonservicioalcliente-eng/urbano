@@ -1,42 +1,228 @@
 window.NassauSuperAdmin = {
+    currentTab: 'usuarios',
     async renderPage() {
         const html = `
             <div class="header-actions">
                 <h2>Panel SuperAdmin</h2>
-                <button class="btn-primary" onclick="window.NassauSuperAdmin.showCreateModal()">+ Nueva Urbanización</button>
+                <button class="btn-primary" id="sa-new-btn" onclick="window.NassauSuperAdmin.showCreateModal()">+ Nueva Cuenta</button>
             </div>
-            <div class="card table-container">
-                <table class="premium-table" id="sa-table">
-                    <thead><tr><th>ID</th><th>Nombre</th><th>Dirección</th><th>Estado</th><th>Acciones</th></tr></thead>
-                    <tbody></tbody>
-                </table>
-            </div>`;
+            <div class="sa-tabs">
+                <button class="sa-tab ${this.currentTab === 'usuarios' ? 'active' : ''}" data-tab="usuarios" onclick="window.NassauSuperAdmin.switchTab('usuarios')">Cuentas Autorizadas</button>
+                <button class="sa-tab ${this.currentTab === 'urb' ? 'active' : ''}" data-tab="urb" onclick="window.NassauSuperAdmin.switchTab('urb')">Urbanizaciones</button>
+            </div>
+            <div class="card table-container" id="sa-content"></div>`;
         document.getElementById('page-superadmin').innerHTML = html;
-        await this.loadUrbanizaciones();
+        await this.loadCurrentTab();
+    },
+    switchTab(tab) {
+        this.currentTab = tab;
+        document.querySelectorAll('.sa-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.getElementById('sa-new-btn').textContent = tab === 'usuarios' ? '+ Nueva Cuenta' : '+ Nueva Urbanización';
+        document.getElementById('sa-new-btn').setAttribute('onclick', tab === 'usuarios'
+            ? 'window.NassauSuperAdmin.showCreateModal()'
+            : 'window.NassauSuperAdmin.showCreateUrbModal()');
+        this.loadCurrentTab();
+    },
+    async loadCurrentTab() {
+        if (this.currentTab === 'usuarios') await this.loadUsuarios();
+        else await this.loadUrbanizaciones();
+    },
+    async loadUsuarios() {
+        try {
+            window.NassauApp.showLoading(true);
+            const users = await window.NassauAPI.apiGet('/usuarios');
+            const now = new Date();
+            const tbody = users.map(u => {
+                const expirado = u.fecha_expiracion && new Date(u.fecha_expiracion) < now;
+                const badge = !u.activo ? 'inactivo' : (expirado ? 'moroso' : 'activo');
+                const badgeTxt = !u.activo ? 'REVOCADA' : (expirado ? 'VENCIDA' : 'ACTIVA');
+                return `
+                <tr>
+                    <td><strong>${u.nombre}</strong></td>
+                    <td>${u.email}</td>
+                    <td><span class="badge badge-${u.rol === 'superadmin' ? 'activo' : 'moroso'}">${u.rol}</span></td>
+                    <td>${u.urbanizacion_nombre || '-'}</td>
+                    <td><span class="badge badge-${badge}">${badgeTxt}</span></td>
+                    <td>${u.fecha_expiracion ? new Date(u.fecha_expiracion).toLocaleDateString() : '-'}</td>
+                    <td>
+                        ${u.rol !== 'superadmin' ? (u.activo && !expirado
+                            ? `<button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.revoke('${u.id}')">Revocar</button>`
+                            : `<button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.reinstate('${u.id}')">Reactivar</button>`)
+                            : '<span style="color:var(--text-secondary);font-size:0.8rem;">—</span>'}
+                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.showEditModal('${u.id}')">Editar</button>
+                        <button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.del('${u.id}', '${u.nombre}')">Eliminar</button>
+                    </td>
+                </tr>`;
+            }).join('');
+            document.getElementById('sa-content').innerHTML = `
+                <table class="premium-table">
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Urbanización</th><th>Estado</th><th>Expiración</th><th>Acciones</th></tr></thead>
+                    <tbody>${tbody}</tbody>
+                </table>`;
+        } catch(e) { window.NassauApp.showToast(e.message || 'Error cargando usuarios', 'error'); }
+        finally { window.NassauApp.showLoading(false); }
     },
     async loadUrbanizaciones() {
         try {
             window.NassauApp.showLoading(true);
-            const urbs = await window.NassauAPI.apiGet('/urbanizaciones/admin');
-            const tbody = document.querySelector('#sa-table tbody');
-            tbody.innerHTML = urbs.map(u => `
+            const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
+            const tbody = urbs.map(u => `
                 <tr>
-                    <td>${u.id}</td><td>${u.nombre}</td><td>${u.direccion || '-'}</td>
-                    <td><span class="badge badge-${u.estado_licencia === 'activa' ? 'activo' : (u.estado_licencia === 'suspendida' ? 'moroso' : 'inactivo')}">${u.estado_licencia}</span></td>
+                    <td><strong>${u.nombre}</strong></td>
+                    <td>${u.direccion || '-'}</td>
+                    <td>${u.email || '-'}</td>
+                    <td><span class="badge badge-${u.estado === 'admitida' ? 'activo' : (u.estado === 'rechazada' ? 'moroso' : 'inactivo')}">${u.estado.toUpperCase()}</span></td>
                     <td>
-                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.updateEstado(${u.id}, 'activa')">Activar</button>
-                        <button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.updateEstado(${u.id}, 'suspendida')">Suspender</button>
+                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'admitida')">Admitir</button>
+                        <button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'rechazada')">Rechazar</button>
                     </td>
                 </tr>`).join('');
-        } catch(e) { window.NassauApp.showToast('Error cargando urbanizaciones', 'error'); } 
+            document.getElementById('sa-content').innerHTML = `
+                <table class="premium-table">
+                    <thead><tr><th>Nombre</th><th>Dirección</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <tbody>${tbody}</tbody>
+                </table>`;
+        } catch(e) { window.NassauApp.showToast(e.message || 'Error cargando urbanizaciones', 'error'); }
         finally { window.NassauApp.showLoading(false); }
     },
+    async loadUrbanizacionesSelect(selectId) {
+        const sel = document.getElementById(selectId);
+        const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
+        sel.innerHTML = `<option value="">— Sin urbanización —</option>` +
+            urbs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
+    },
     showCreateModal() {
+        const html = `
+            <form onsubmit="window.NassauSuperAdmin.create(event)">
+                <div class="form-group"><label>Nombre Completo</label><input type="text" id="us-nombre" required></div>
+                <div class="form-group"><label>Email (login)</label><input type="email" id="us-email" required></div>
+                <div class="form-group"><label>Contraseña (mín. 8 caracteres)</label><input type="text" id="us-password" required minlength="8"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Rol</label>
+                        <select id="us-rol" onchange="document.getElementById('us-urb-wrap').style.display = this.value === 'superadmin' ? 'none' : 'block'">
+                            <option value="admin_urb">Administrador</option>
+                            <option value="propietario">Propietario</option>
+                            <option value="superadmin">SuperAdmin</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="us-urb-wrap"><label>Urbanización</label><select id="us-urb"></select></div>
+                </div>
+                <div class="form-group"><label>Expiración de registro</label><input type="date" id="us-exp"></div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Crear</button>
+                </div>
+            </form>`;
+        window.NassauApp.showModal('Nueva Cuenta Autorizada', html);
+        this.loadUrbanizacionesSelect('us-urb');
+    },
+    async create(e) {
+        e.preventDefault();
+        const data = {
+            nombre: document.getElementById('us-nombre').value,
+            email: document.getElementById('us-email').value,
+            password: document.getElementById('us-password').value,
+            rol: document.getElementById('us-rol').value,
+            urbanizacion_id: document.getElementById('us-urb').value || null,
+            fecha_expiracion: document.getElementById('us-exp').value || null
+        };
+        this.save(data, true);
+    },
+    async showEditModal(id) {
+        const users = await window.NassauAPI.apiGet('/usuarios');
+        const u = users.find(x => x.id === id);
+        if (!u) return window.NassauApp.showToast('Usuario no encontrado', 'error');
+        const exp = u.fecha_expiracion ? u.fecha_expiracion.slice(0, 10) : '';
+        const html = `
+            <form onsubmit="window.NassauSuperAdmin.saveEdit('${id}', event)">
+                <div class="form-group"><label>Nombre Completo</label><input type="text" id="us-nombre" value="${u.nombre}" required></div>
+                <div class="form-group"><label>Email (login)</label><input type="email" id="us-email" value="${u.email}" required></div>
+                <div class="form-group"><label>Nueva Contraseña (dejar vacío para no cambiar)</label><input type="text" id="us-password" minlength="8" placeholder="••••••••"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Rol</label>
+                        <select id="us-rol">
+                            <option value="admin_urb" ${u.rol === 'admin_urb' ? 'selected' : ''}>Administrador</option>
+                            <option value="propietario" ${u.rol === 'propietario' ? 'selected' : ''}>Propietario</option>
+                            <option value="superadmin" ${u.rol === 'superadmin' ? 'selected' : ''}>SuperAdmin</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Urbanización</label><select id="us-urb"></select></div>
+                </div>
+                <div class="form-group"><label>Expiración de registro</label><input type="date" id="us-exp" value="${exp}"></div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar</button>
+                </div>
+            </form>`;
+        window.NassauApp.showModal('Editar Cuenta', html);
+        const sel = document.getElementById('us-urb');
+        const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
+        sel.innerHTML = `<option value="">— Sin urbanización —</option>` +
+            urbs.map(x => `<option value="${x.id}">${x.nombre}</option>`).join('');
+        sel.value = u.urbanizacion_id || '';
+    },
+    async saveEdit(id, e) {
+        e.preventDefault();
+        const data = {
+            nombre: document.getElementById('us-nombre').value,
+            email: document.getElementById('us-email').value,
+            rol: document.getElementById('us-rol').value,
+            urbanizacion_id: document.getElementById('us-urb').value || null,
+            fecha_expiracion: document.getElementById('us-exp').value || null
+        };
+        const pw = document.getElementById('us-password').value;
+        if (pw) data.password = pw;
+        await this.save(data, false, id);
+    },
+    async save(data, isCreate, id) {
+        try {
+            window.NassauApp.showLoading(true);
+            if (isCreate) await window.NassauAPI.apiPost('/usuarios', data);
+            else await window.NassauAPI.apiPut(`/usuarios/${id}`, data);
+            window.NassauApp.showToast(isCreate ? 'Cuenta creada' : 'Cuenta actualizada', 'success');
+            window.NassauApp.closeModal();
+            this.loadUsuarios();
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    async revoke(id) {
+        if(!confirm('¿Revocar (bloquear) esta cuenta? El usuario no podrá iniciar sesión.')) return;
+        try {
+            window.NassauApp.showLoading(true);
+            await window.NassauAPI.apiPut(`/usuarios/${id}/revoke`, {});
+            window.NassauApp.showToast('Cuenta revocada', 'success');
+            this.loadUsuarios();
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    async reinstate(id) {
+        if(!confirm('¿Reactivar esta cuenta?')) return;
+        try {
+            window.NassauApp.showLoading(true);
+            await window.NassauAPI.apiPut(`/usuarios/${id}/reinstate`, {});
+            window.NassauApp.showToast('Cuenta reactivada', 'success');
+            this.loadUsuarios();
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    async del(id, nombre) {
+        if(!confirm(`¿Eliminar definitivamente a "${nombre}"? Esta acción no se puede deshacer.`)) return;
+        try {
+            window.NassauApp.showLoading(true);
+            await window.NassauAPI.apiDelete(`/usuarios/${id}`);
+            window.NassauApp.showToast('Cuenta eliminada', 'success');
+            this.loadUsuarios();
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    showCreateUrbModal() {
         const html = `
             <form onsubmit="window.NassauSuperAdmin.createUrb(event)">
                 <div class="form-group"><label>Nombre</label><input type="text" id="sa-nombre" required></div>
                 <div class="form-group"><label>Dirección</label><input type="text" id="sa-dir"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="sa-email"></div>
                 <div class="form-group"><label>Teléfono</label><input type="text" id="sa-tel"></div>
+                <div class="form-group"><label>Prefijo Documento</label><input type="text" id="sa-prefijo" value="NAS" maxlength="10"></div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
                     <button type="submit" class="btn-primary">Crear</button>
@@ -49,25 +235,27 @@ window.NassauSuperAdmin = {
         const data = {
             nombre: document.getElementById('sa-nombre').value,
             direccion: document.getElementById('sa-dir').value,
-            telefono_contacto: document.getElementById('sa-tel').value
+            email: document.getElementById('sa-email').value,
+            telefono: document.getElementById('sa-tel').value,
+            prefijo_doc: document.getElementById('sa-prefijo').value.trim().toUpperCase() || 'NAS'
         };
         try {
             window.NassauApp.showLoading(true);
             await window.NassauAPI.apiPost('/urbanizaciones', data);
-            window.NassauApp.showToast('Urbanización creada', 'success');
+            window.NassauApp.showToast('Urbanización creada (pendiente de aprobación)', 'success');
             window.NassauApp.closeModal();
             this.loadUrbanizaciones();
-        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); } 
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
         finally { window.NassauApp.showLoading(false); }
     },
     async updateEstado(id, estado) {
-        if(!confirm(`¿Cambiar estado a ${estado}?`)) return;
+        if(!confirm(`¿Cambiar estado a ${estado.toUpperCase()}?`)) return;
         try {
             window.NassauApp.showLoading(true);
-            await window.NassauAPI.apiPut(`/urbanizaciones/${id}/estado`, { estado_licencia: estado });
+            await window.NassauAPI.apiPut(`/urbanizaciones/${id}/estado`, { estado });
             window.NassauApp.showToast('Estado actualizado', 'success');
             this.loadUrbanizaciones();
-        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); } 
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
         finally { window.NassauApp.showLoading(false); }
     }
 };

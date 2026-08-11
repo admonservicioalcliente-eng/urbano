@@ -1,5 +1,41 @@
 // handlers/superadmin.js — Gestión de urbanizaciones admitidas/rechazadas
 import { query } from '../db.js';
+import { hashPassword } from '../auth.js';
+
+export async function handleRegistroUrbanizacion(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
+
+  const { nombre, direccion, telefono, email, prefijo_doc, admin_nombre, admin_email, admin_password } = body;
+  if (!nombre) return err(400, 'El nombre de la urbanización es obligatorio');
+  if (!admin_nombre || !admin_email || !admin_password) return err(400, 'Nombre, email y contraseña del administrador son obligatorios');
+  if (admin_password.length < 8) return err(400, 'La contraseña debe tener al menos 8 caracteres');
+
+  const password_hash = await hashPassword(admin_password);
+
+  try {
+    const existing = await query(env, `SELECT id FROM usuarios WHERE email = $1`, [admin_email.toLowerCase().trim()]);
+    if (existing.length) return err(400, 'Ya existe un usuario con ese email');
+
+    const urb = await query(env,
+      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc)
+       VALUES ($1, $2, $3, $4, 'pendiente', $5) RETURNING *`,
+      [nombre.trim(), direccion || null, telefono || null, email || null, (prefijo_doc || 'NAS').toUpperCase().substring(0, 10)]
+    );
+
+    const usr = await query(env,
+      `INSERT INTO usuarios (nombre, email, password_hash, rol, urbanizacion_id, activo)
+       VALUES ($1, $2, $3, 'admin_urb', $4, TRUE)
+       RETURNING id, nombre, email, rol, activo, urbanizacion_id`,
+      [admin_nombre.trim(), admin_email.toLowerCase().trim(), password_hash, urb[0].id]
+    );
+
+    return ok({ urbanizacion: urb[0], usuario: usr[0] }, 201);
+  } catch (ex) {
+    if (ex.message?.includes('usuarios_email_key')) return err(400, 'Ya existe un usuario con ese email');
+    return err(500, ex.message);
+  }
+}
 
 export async function handleGetUrbanizaciones(request, env, user) {
   if (user.rol !== 'superadmin') return err(403, 'Acceso denegado');

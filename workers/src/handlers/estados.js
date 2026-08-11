@@ -1,6 +1,80 @@
 // handlers/estados.js — Estados de cuenta & dashboard
 import { query } from '../db.js';
 
+// Concilia los pagos registrados del propietario con sus estados de cuenta:
+// vincula pagos sin estado asociado y recalcula saldo_aplicado / cerrado.
+async function conciliarPagos(env, propietarioId) {
+  // 1. Vincular pagos huérfanos al estado abierto más antiguo
+  const unlinked = await query(env,
+    `SELECT * FROM pagos
+     WHERE propietario_id = $1 AND estado_cuenta_id IS NULL
+     ORDER BY fecha_pago ASC, created_at ASC`,
+    [propietarioId]
+  );
+
+  for (const pg of unlinked) {
+    const openRows = await query(env,
+      `SELECT id FROM estados_cuenta
+       WHERE propietario_id = $1 AND cerrado = false
+       ORDER BY anio ASC, mes ASC LIMIT 1`,
+      [propietarioId]
+    );
+    let ecId;
+    if (openRows.length) {
+      ecId = openRows[0].id;
+    } else {
+      const fd = new Date(pg.fecha_pago);
+      const anioP = fd.getFullYear();
+      const mesP = fd.getMonth() + 1;
+      const propRow = await query(env, `SELECT cuota_admon FROM propietarios WHERE id = $1`, [propietarioId]);
+      const paramCuota = await query(env,
+        `SELECT cuota_admon FROM parametros_anio WHERE anio = $1 ORDER BY anio DESC LIMIT 1`,
+        [anioP]
+      );
+      const cuota = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
+        ? parseFloat(paramCuota[0].cuota_admon) : (parseFloat(propRow[0].cuota_admon) || 0);
+
+      const created = await query(env,
+        `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+         VALUES ($1, $2, $3, $4, 0, 0, 0, $5)
+         ON CONFLICT (propietario_id, anio, mes) DO NOTHING
+         RETURNING id`,
+        [propietarioId, anioP, mesP, cuota, null]
+      );
+      if (created.length) {
+        ecId = created[0].id;
+      } else {
+        const existing = await query(env,
+          `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
+          [propietarioId, anioP, mesP]
+        );
+        if (existing.length) ecId = existing[0].id;
+      }
+    }
+    if (ecId) {
+      await query(env, `UPDATE pagos SET estado_cuenta_id = $1 WHERE id = $2`, [ecId, pg.id]);
+    }
+  }
+
+  // 2. Recalcular cada estado con sus pagos vinculados
+  const estados = await query(env,
+    `SELECT * FROM estados_cuenta WHERE propietario_id = $1 ORDER BY anio ASC, mes ASC`,
+    [propietarioId]
+  );
+  for (const ec of estados) {
+    const base = parseFloat(ec.pago_actual) + parseFloat(ec.saldo_anterior) + parseFloat(ec.intereses);
+    const sumP = await query(env,
+      `SELECT COALESCE(SUM(monto), 0) t FROM pagos WHERE estado_cuenta_id = $1`,
+      [ec.id]
+    );
+    const paid = parseFloat(sumP[0].t) || 0;
+    await query(env,
+      `UPDATE estados_cuenta SET saldo_favor = $1, cerrado = $2 WHERE id = $3`,
+      [paid, paid >= base, ec.id]
+    );
+  }
+}
+
 export async function handleGetByPropietario(request, env, user) {
   const url = new URL(request.url);
   const propId = url.searchParams.get('propietario_id');
@@ -9,34 +83,62 @@ export async function handleGetByPropietario(request, env, user) {
   if (!propId) return err(400, 'ID de propietario requerido');
 
   // Validar pertenencia
-  const propRows = await query(env, `SELECT urbanizacion_id FROM propietarios WHERE id = $1`, [propId]);
+  const propRows = await query(env, `SELECT urbanizacion_id, estado, cuota_admon FROM propietarios WHERE id = $1`, [propId]);
   if (!propRows.length) return err(404, 'Propietario no encontrado');
   if (user.rol !== 'superadmin' && propRows[0].urbanizacion_id !== user.urbanizacion_id) {
     return err(403, 'Acceso denegado');
   }
 
-  // Ejecutar el cálculo y recalculo de intereses al vuelo para periodos abiertos
-  const openEcs = await query(env, 
-    `SELECT id FROM estados_cuenta WHERE propietario_id = $1 AND cerrado = false`, 
-    [propId]
-  );
-  
-  for (const ec of openEcs) {
-    await query(env, 
-      `UPDATE estados_cuenta SET 
-        intereses = COALESCE((SELECT calcular_intereses($1)), 0)
-       WHERE id = $1`, 
-      [ec.id]
-    );
-  }
+  // Reconciliar pagos y recalcular intereses proporcionales al día antes de mostrar
+  await conciliarPagos(env, propId);
+  await query(env, `SELECT actualizar_intereses_propietario($1)`, [propId]);
+  await conciliarPagos(env, propId);
 
-  // Traer los estados de cuenta actualizados
+  // Traer los estados de cuenta del año
   const estados = await query(env,
     `SELECT * FROM estados_cuenta
      WHERE propietario_id = $1 AND anio = $2
      ORDER BY mes ASC`,
     [propId, parseInt(anio)]
   );
+
+  // Si se consulta el año actual y el propietario está activo pero aún no se le
+  // ha generado el estado de cuenta del mes en curso (sin cuenta de cobro del
+  // mes), la cuota de administración de ese mes se considera deuda vigente.
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+
+  if (parseInt(anio) === anioActual && propRows[0].estado !== 'inactivo') {
+    const yaTieneMes = estados.some(e => parseInt(e.mes) === mesActual);
+    if (!yaTieneMes) {
+      const params = await query(env,
+        `SELECT cuota_admon FROM parametros_anio
+         WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
+        [propRows[0].urbanizacion_id, anioActual]
+      );
+      const cuota = (params.length && parseFloat(params[0].cuota_admon) > 0)
+        ? parseFloat(params[0].cuota_admon)
+        : (parseFloat(propRows[0].cuota_admon) || 0);
+
+      estados.push({
+        id: null,
+        propietario_id: propId,
+        anio: anioActual,
+        mes: mesActual,
+        pago_actual: cuota,
+        saldo_anterior: 0,
+        saldo_favor: 0,
+        intereses: 0,
+        total_deuda: cuota,
+        fecha_vencimiento: null,
+        generado_at: null,
+        cerrado: false,
+        notas: null,
+        dias_mora: 0
+      });
+    }
+  }
 
   // Totales generales acumulados del propietario
   const totals = await query(env,
@@ -49,10 +151,7 @@ export async function handleGetByPropietario(request, env, user) {
     [propId]
   );
 
-  return ok({
-    estados,
-    resumen: totals[0]
-  });
+  return ok(estados);
 }
 
 export async function handleUpdateIntereses(request, env, user) {

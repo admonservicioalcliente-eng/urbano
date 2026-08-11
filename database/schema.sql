@@ -43,6 +43,7 @@ CREATE TABLE parametros_anio (
     dia_generacion_cuota     INTEGER NOT NULL DEFAULT 1,
     dia_vencimiento_sin_mora INTEGER NOT NULL DEFAULT 5,
     dia_inicio_mora          INTEGER NOT NULL DEFAULT 6,
+    cuota_admon              DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(urbanizacion_id, anio)
 );
@@ -58,6 +59,7 @@ CREATE TABLE usuarios (
     password_hash    VARCHAR(255) NOT NULL,
     rol              rol_usuario NOT NULL DEFAULT 'admin_urb',
     activo           BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_expiracion TIMESTAMPTZ,
     ultimo_login     TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -229,7 +231,8 @@ BEGIN
             saldo_anterior, saldo_favor, intereses, fecha_vencimiento
         )
         VALUES (
-            v_prop.id, p_anio, p_mes, v_prop.cuota_admon,
+            v_prop.id, p_anio, p_mes,
+            CASE WHEN v_params.cuota_admon > 0 THEN v_params.cuota_admon ELSE v_prop.cuota_admon END,
             v_saldo_ant, 0, 0, v_fecha_vcto
         )
         ON CONFLICT (propietario_id, anio, mes) DO NOTHING;

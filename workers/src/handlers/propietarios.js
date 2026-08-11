@@ -36,7 +36,7 @@ export async function handleCreate(request, env, user) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas } = body;
+  const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial } = body;
   if (!nombre_propietario || !apartamento) return err(400, 'Nombre y Apartamento son requeridos');
 
   const urbId = user.urbanizacion_id;
@@ -46,15 +46,22 @@ export async function handleCreate(request, env, user) {
     const rows = await query(env,
       `INSERT INTO propietarios (
         urbanizacion_id, nombre_propietario, apartamento, no_celda, 
-        cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas,
+        prefijo, mes_inicio, anio_inicio, abono_inicial
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
       [
-        urbId, nombre_propietario, apartamento, no_celda, 
-        cuota_admon || 0, estado || 'activo', numero_cuenta, modo_pago || 'efectivo',
-        telefono, email, notas
+        urbId, nombre_propietario, apartamento, no_celda || null, 
+        cuota_admon || 0, estado || 'activo', numero_cuenta || null, modo_pago || 'efectivo',
+        telefono || null, email || null, notas || null,
+        prefijo || null, mes_inicio || null, anio_inicio || null, parseFloat(abono_inicial) || 0
       ]
     );
-    return ok(rows[0], 201);
+    const prop = rows[0];
+
+    // Sembrar estado de cuenta desde mes/anio de inicio hasta el mes actual
+    await sembrarEstadosInicio(env, prop);
+
+    return ok(prop, 201);
   } catch (ex) {
     if (ex.message.includes('unique') || ex.message.includes('violates unique constraint')) {
       return err(400, 'El apartamento ya está registrado');
@@ -73,7 +80,7 @@ export async function handleUpdate(request, env, user, id) {
     return err(403, 'Acceso denegado');
   }
 
-  const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas } = body;
+  const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial } = body;
 
   const updateRows = await query(env,
     `UPDATE propietarios SET
@@ -87,12 +94,20 @@ export async function handleUpdate(request, env, user, id) {
       telefono = $8,
       email = $9,
       notas = $10,
+      prefijo = $11,
+      mes_inicio = $12,
+      anio_inicio = $13,
+      abono_inicial = COALESCE($14, abono_inicial),
       updated_at = NOW()
-    WHERE id = $11 RETURNING *`,
-    [nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, id]
+    WHERE id = $15 RETURNING *`,
+    [nombre_propietario || null, apartamento || null, no_celda || null, cuota_admon || null, estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0, id]
   );
 
-  return ok(updateRows[0]);
+  // Si se definió mes/año de inicio, sembrar estados faltantes
+  const updated = updateRows[0];
+  await sembrarEstadosInicio(env, updated);
+
+  return ok(updated);
 }
 
 export async function handleDelete(request, env, user, id) {
@@ -115,6 +130,66 @@ export async function handleDelete(request, env, user, id) {
     await query(env, `DELETE FROM propietarios WHERE id = $1`, [id]);
     return ok({ message: 'Propietario eliminado correctamente' });
   }
+}
+
+// Crea los estados de cuenta del propietario desde su mes/anio de inicio
+// hasta el mes actual inclusive (deuda histórica acumulada).
+async function sembrarEstadosInicio(env, prop) {
+  const estado = prop.estado;
+  const mesInicio = parseInt(prop.mes_inicio);
+  const anioInicio = parseInt(prop.anio_inicio);
+  if (estado !== 'moroso' && estado !== 'abono_inicial') return;
+  if (!mesInicio || !anioInicio) return;
+
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+
+  let cursorAnio = anioInicio;
+  let cursorMes = mesInicio;
+  const generados = [];
+
+  while (cursorAnio < anioActual || (cursorAnio === anioActual && cursorMes <= mesActual)) {
+    // Cuota del año correspondiente según parámetros (si existe)
+    const params = await query(env,
+      `SELECT cuota_admon FROM parametros_anio
+       WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
+      [prop.urbanizacion_id, cursorAnio]
+    );
+    const cuota = (params.length && parseFloat(params[0].cuota_admon) > 0)
+      ? parseFloat(params[0].cuota_admon)
+      : (parseFloat(prop.cuota_admon) || 0);
+
+    const created = await query(env,
+      `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (propietario_id, anio, mes) DO NOTHING
+       RETURNING *`,
+      [prop.id, cursorAnio, cursorMes, cuota]
+    );
+    if (created.length) generados.push(created[0]);
+
+    cursorMes++;
+    if (cursorMes > 12) { cursorMes = 1; cursorAnio++; }
+  }
+
+  // Aplicar abono inicial como saldo a favor del estado más antiguo
+  if (parseFloat(prop.abono_inicial) > 0) {
+    const primerEstado = await query(env,
+      `SELECT * FROM estados_cuenta
+       WHERE propietario_id = $1
+       ORDER BY anio ASC, mes ASC LIMIT 1`,
+      [prop.id]
+    );
+    if (primerEstado.length) {
+      await query(env,
+        `UPDATE estados_cuenta SET saldo_favor = $1, cerrado = $2 WHERE id = $3`,
+        [parseFloat(prop.abono_inicial), parseFloat(prop.abono_inicial) >= (parseFloat(primerEstado[0].pago_actual) + parseFloat(primerEstado[0].saldo_anterior) + parseFloat(primerEstado[0].intereses)), primerEstado[0].id]
+      );
+    }
+  }
+
+  return generados;
 }
 
 export async function handleResumen(request, env, user, id) {

@@ -9,6 +9,7 @@ body { background-color: var(--bg-primary); color: var(--text-primary); min-heig
 .login-card { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 2.5rem; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
 .login-logo { width: 80px; height: 80px; border-radius: 50%; margin-bottom: 1rem; border: 2px solid var(--accent); }
 .login-card h2 { margin-bottom: 1.5rem; font-weight: 600; }
+.login-footer { position: fixed; bottom: 1rem; left: 0; right: 0; text-align: center; font-size: 0.8rem; color: var(--text-secondary, #888); }
 .form-group { margin-bottom: 1.2rem; text-align: left; }
 .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; color: var(--text-secondary); }
 .form-row { display: flex; gap: 1rem; } .form-row .form-group { flex: 1; }
@@ -21,6 +22,9 @@ button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-weight:
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary { background: var(--glass); color: var(--text-primary); border: 1px solid var(--border); }
 .btn-secondary:hover { background: var(--glass-hover); }
+.btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn-outline:hover { background: rgba(245, 158, 11, 0.1); }
+.login-divider { margin: 1rem 0; color: var(--text-secondary); font-size: 0.85rem; }
 .btn-danger { background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid rgba(239, 68, 68, 0.3); }
 .btn-danger:hover { background: var(--error); color: white; }
 .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
@@ -33,6 +37,10 @@ button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-weight:
 .user-info { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 .main-content { flex: 1; margin-left: 260px; padding: 2rem; width: calc(100% - 260px); }
 .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.sa-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+.sa-tab { background: var(--glass); color: var(--text-secondary); border: 1px solid var(--border); padding: 0.5rem 1.2rem; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+.sa-tab:hover { background: var(--glass-hover); }
+.sa-tab.active { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%); color: white; border-color: transparent; }
 .actions-right { display: flex; gap: 1rem; }
 .card { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; }
 .table-container { overflow-x: auto; }
@@ -61,6 +69,14 @@ button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-weight:
 #toast.show { transform: translateX(0); }
 .toast-success { background: var(--success); } .toast-error { background: var(--error); } .toast-info { background: var(--accent); }
 #mobile-menu-btn { display: none; background:none; border:none; color:white; font-size:1.5rem;}
+.config-consec-control { display: flex; align-items: center; gap: 0.4rem; }
+.config-consec-input { width: 55px; padding: 0.25rem 0.4rem; text-align: center; }
+.config-field { width: 55px; padding: 0.25rem 0.4rem; text-align: center; border: 1px solid var(--border, #ddd); border-radius: 6px; }
+.config-dias-control { display: flex; align-items: center; gap: 0.15rem; }
+.config-suffix { font-size: 0.8rem; color: var(--text-secondary, #666); }
+.config-table { white-space: nowrap; }
+.config-table th, .config-table td { padding: 0.5rem 0.6rem; }
+.config-table .config-consec-control button { padding: 0.15rem 0.4rem; }
 @media (max-width: 768px) {
     #mobile-menu-btn { display: block; }
     .sidebar { transform: translateX(-100%); } .sidebar.active { transform: translateX(0); }
