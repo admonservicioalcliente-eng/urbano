@@ -89,10 +89,12 @@ export async function handleCreate(request, env, user) {
   // Reconciliar pagos y recalcular intereses al día antes de la snapshot
   await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
 
-  // Traer estado de deuda actual para inyectar en snapshot (detalle_json)
+  // Traer TODOS los estados (abiertos y cerrados) para el cuerpo de la CC:
+  // el primer mes del propietario (mes de inicio) queda cerrado cuando el
+  // abono inicial cubre la cuota, pero debe seguir apareciendo como ítem.
   let ecs = await query(env,
     `SELECT * FROM estados_cuenta
-     WHERE propietario_id = $1 AND cerrado = false
+     WHERE propietario_id = $1
      ORDER BY anio ASC, mes ASC`,
     [propietario_id]
   );
@@ -143,16 +145,11 @@ export async function handleCreate(request, env, user) {
     totalExtras += parseFloat(ex.monto) || 0;
   }
 
-  // Saldo a favor acumulado del propietario: excedentes de pagos en cualquier
-  // estado (cerrados incluidos) con total_deuda negativo (crédito a favor).
-  const creditRows = await query(env,
-    `SELECT COALESCE(SUM(GREATEST(0, -total_deuda)), 0) AS credito
-     FROM estados_cuenta WHERE propietario_id = $1`,
-    [propietario_id]
-  );
-  const creditoAcumulado = parseFloat(creditRows[0].credito) || 0;
-
-  const saldoFavorTotal = totalSaldoFavor + creditoAcumulado;
+  // El cuerpo ahora incluye TODOS los estados, así que el saldo a favor y los
+  // créditos de estados cerrados ya están capturados en totalSaldoFavor (vía
+  // saldo_favor). No se suma crédito adicional para evitar doble descuento.
+  const creditoAcumulado = 0;
+  const saldoFavorTotal = totalSaldoFavor;
   // El abono inicial ya está aplicado como saldo_favor del primer estado
   // (sembrarEstadosInicio), así que no debe restarse de nuevo aquí.
   const totalDeuda = totalCuota + totalSaldoAnt + totalInteres + totalExtras - saldoFavorTotal;
