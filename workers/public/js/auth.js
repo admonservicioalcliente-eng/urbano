@@ -29,6 +29,7 @@ window.NassauAuth = {
             const data = await window.NassauAPI.apiPost('/auth/login', { email, password, urb_id, cf_token });
             localStorage.setItem('nassau_token', data.token);
             localStorage.setItem('nassau_urb_id', urb_id);
+            if (data.user?.urbanizacion_nombre) localStorage.setItem('nassau_urb_nombre', data.user.urbanizacion_nombre);
             this.initAuth();
             window.NassauApp?.showToast('Login exitoso', 'success');
         } catch (error) { window.NassauApp?.showToast(error.message, 'error'); } 
@@ -37,6 +38,7 @@ window.NassauAuth = {
     logout() {
         localStorage.removeItem('nassau_token');
         localStorage.removeItem('nassau_urb_id');
+        localStorage.removeItem('nassau_urb_nombre');
         this.renderLoginPage();
     },    isLoggedIn() {
         const token = localStorage.getItem('nassau_token');
@@ -62,6 +64,13 @@ window.NassauAuth = {
             if (el) el.textContent = user.email || user.name || 'Usuario';
             const saLink = document.querySelector('a[data-page="superadmin"]');
             if (saLink) saLink.style.display = user.rol === 'superadmin' ? 'flex' : 'none';
+            // Título de la app = nombre de la urbanización del usuario logueado
+            const titleEl = document.getElementById('app-brand-title');
+            if (titleEl) {
+                const urb = localStorage.getItem('nassau_urb_nombre') || user.urbanizacion_nombre || 'NASSAU P.H.';
+                titleEl.textContent = urb;
+                document.title = `${urb} - Administración`;
+            }
         }
     }
 };

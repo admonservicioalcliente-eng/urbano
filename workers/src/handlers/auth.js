@@ -71,7 +71,11 @@ export async function handleLogin(request, env) {
     urbanizacion_id: urbanizacionId
   }, env.JWT_SECRET);
 
-  return ok({ token, user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, urbanizacion_id: urbanizacionId } });
+  // Nombre de la urbanización para mostrar como título de la app
+  const urbNameRows = await query(env, `SELECT nombre FROM urbanizaciones WHERE id = $1`, [urbanizacionId]);
+  const urbanizacion_nombre = urbNameRows.length ? urbNameRows[0].nombre : null;
+
+  return ok({ token, user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, urbanizacion_id: urbanizacionId, urbanizacion_nombre } });
 }
 
 /**
