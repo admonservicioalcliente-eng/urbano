@@ -39,6 +39,13 @@ export async function handleCreate(request, env, user) {
   const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial } = body;
   if (!nombre_propietario || !apartamento) return err(400, 'Nombre y Apartamento son requeridos');
 
+  if (estado === 'moroso' || estado === 'abono_inicial') {
+    if (!mes_inicio || !anio_inicio) return err(400, 'Para el estado ' + estado + ' debe indicar el mes y año de inicio');
+    if (estado === 'abono_inicial' && (!abono_inicial || parseFloat(abono_inicial) <= 0)) {
+      return err(400, 'Para el estado abono_inicial debe indicar un abono inicial mayor a 0');
+    }
+  }
+
   const urbId = user.urbanizacion_id;
   if (!urbId) return err(400, 'El usuario no tiene una urbanización asignada');
 
@@ -81,6 +88,13 @@ export async function handleUpdate(request, env, user, id) {
   }
 
   const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial } = body;
+
+  if (estado === 'moroso' || estado === 'abono_inicial') {
+    if (!mes_inicio || !anio_inicio) return err(400, 'Para el estado ' + estado + ' debe indicar el mes y año de inicio');
+    if (estado === 'abono_inicial' && (!abono_inicial || parseFloat(abono_inicial) <= 0)) {
+      return err(400, 'Para el estado abono_inicial debe indicar un abono inicial mayor a 0');
+    }
+  }
 
   const updateRows = await query(env,
     `UPDATE propietarios SET

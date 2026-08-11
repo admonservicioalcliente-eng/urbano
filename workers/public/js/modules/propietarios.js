@@ -140,13 +140,13 @@ window.NassauPropietarios = {
                     </p>
                     <div class="form-row">
                         <div class="form-group"><label>Mes de inicio *</label>
-                            <select id="prop-mes-inicio" required>
+                            <select id="prop-mes-inicio" ${mostrarInicio ? 'required' : ''}>
                                 <option value="">— Seleccione —</option>
                                 ${mesNames.slice(1).map((n, i) => `<option value="${i + 1}" ${p.mes_inicio == (i + 1) ? 'selected' : ''}>${n}</option>`).join('')}
                             </select>
                         </div>
                         <div class="form-group"><label>Año de inicio *</label>
-                            <select id="prop-anio-inicio" onchange="window.NassauPropietarios.filtrarMesesInicio()">
+                            <select id="prop-anio-inicio" ${mostrarInicio ? 'required' : ''} onchange="window.NassauPropietarios.filtrarMesesInicio()">
                                 <option value="">— Seleccione —</option>
                                 ${[anioActual, anioActual - 1, anioActual - 2, anioActual - 3].map(a =>
                                     `<option value="${a}" ${p.anio_inicio == a ? 'selected' : ''}>${a}</option>`).join('')}
@@ -172,8 +172,14 @@ window.NassauPropietarios = {
         const wrap = document.getElementById('prop-inicio-wrap');
         const abonoWrap = document.getElementById('prop-abono-wrap');
         const abonoInput = document.getElementById('prop-abono');
-        if (wrap) wrap.style.display = (estado === 'moroso' || estado === 'abono_inicial') ? 'block' : 'none';
+        const mesSel = document.getElementById('prop-mes-inicio');
+        const anioSel = document.getElementById('prop-anio-inicio');
+        const visible = (estado === 'moroso' || estado === 'abono_inicial');
+        if (wrap) wrap.style.display = visible ? 'block' : 'none';
         if (abonoWrap) abonoWrap.style.display = estado === 'abono_inicial' ? 'block' : 'none';
+        if (mesSel) mesSel.required = visible;
+        if (anioSel) anioSel.required = visible;
+        if (visible) this.filtrarMesesInicio();
     },
     filtrarMesesInicio() {
         const anioSel = parseInt(document.getElementById('prop-anio-inicio').value);
