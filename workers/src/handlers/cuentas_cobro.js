@@ -203,7 +203,7 @@ export async function handleCreate(request, env, user) {
       banco: 'NEQUI',
       tipo: 'Cuenta',
       numero: '3002272559',
-      titular: 'PAULA ANDREA HERRERA CANO'
+      titular: 'SONEIDA OSSA QUINTERO'
     },
     celular: '324 502 52 01 - 311 392 60 86',
     nota: 'PAGAR CUMPLIDAMENTE NOS HACE TENER UNA MEJOR CALIDAD DE VIDA'

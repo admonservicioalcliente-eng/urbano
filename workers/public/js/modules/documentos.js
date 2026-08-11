@@ -206,7 +206,7 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
             doc.text('NEQUI  3002272559', W / 2, yf + 9, { align: 'center' });
             doc.setFont('helvetica', 'bold');
-            doc.text('PAULA ANDREA HERRERA CANO', W / 2, yf + 13.5, { align: 'center' });
+            doc.text('SONEIDA OSSA QUINTERO', W / 2, yf + 13.5, { align: 'center' });
             doc.setFont('helvetica', 'normal');
             doc.text('Cualquier pago favor enviar a: admonednassau@gmail.com o al cel. 300 227 25 58', W / 2, yf + 18, { align: 'center' });
             doc.setTextColor(0, 150, 150); doc.setFont('helvetica', 'bolditalic');
