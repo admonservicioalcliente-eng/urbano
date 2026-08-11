@@ -68,7 +68,10 @@ export async function handleCreate(request, env, user) {
     // Sembrar estado de cuenta desde mes/anio de inicio hasta el mes actual
     await sembrarEstadosInicio(env, prop);
 
-    return ok(prop, 201);
+    // El abono inicial puede cambiar el estado a 'activo'; devolver el estado final
+    const final = await query(env, `SELECT * FROM propietarios WHERE id = $1`, [prop.id]);
+
+    return ok(final[0], 201);
   } catch (ex) {
     if (ex.message.includes('unique') || ex.message.includes('violates unique constraint')) {
       return err(400, 'El apartamento ya está registrado');
@@ -121,7 +124,9 @@ export async function handleUpdate(request, env, user, id) {
   const updated = updateRows[0];
   await sembrarEstadosInicio(env, updated);
 
-  return ok(updated);
+  // El abono inicial puede cambiar el estado a 'activo'; devolver el estado final
+  const final = await query(env, `SELECT * FROM propietarios WHERE id = $1`, [id]);
+  return ok(final[0]);
 }
 
 export async function handleDelete(request, env, user, id) {
@@ -187,7 +192,9 @@ async function sembrarEstadosInicio(env, prop) {
     if (cursorMes > 12) { cursorMes = 1; cursorAnio++; }
   }
 
-  // Aplicar abono inicial como saldo a favor del estado más antiguo
+  // Aplicar abono inicial como pago real vinculado al estado más antiguo.
+  // Se registra en la tabla pagos (tipo 'abono') para que conciliarPagos
+  // lo mantenga como saldo_favor y la cuenta de cobro lo descuente.
   if (parseFloat(prop.abono_inicial) > 0) {
     const primerEstado = await query(env,
       `SELECT * FROM estados_cuenta
@@ -196,11 +203,33 @@ async function sembrarEstadosInicio(env, prop) {
       [prop.id]
     );
     if (primerEstado.length) {
+      const yaExiste = await query(env,
+        `SELECT id FROM pagos
+         WHERE propietario_id = $1 AND tipo_pago = 'abono' AND comprobante = 'ABONO-INICIAL'
+         LIMIT 1`,
+        [prop.id]
+      );
+      if (!yaExiste.length) {
+        await query(env,
+          `INSERT INTO pagos (propietario_id, estado_cuenta_id, monto, fecha_pago, tipo_pago, comprobante, descripcion)
+           VALUES ($1, $2, $3, $4, 'abono', 'ABONO-INICIAL', 'Abono inicial registrado')
+           ON CONFLICT DO NOTHING`,
+          [prop.id, primerEstado[0].id, parseFloat(prop.abono_inicial), prop.created_at ? new Date(prop.created_at).toISOString().slice(0, 10) : null]
+        );
+      }
+      // Sincronizar saldo_favor del primer estado con el total pagado
+      const sumPagos = await query(env,
+        `SELECT COALESCE(SUM(monto), 0) AS t FROM pagos WHERE estado_cuenta_id = $1`,
+        [primerEstado[0].id]
+      );
+      const totalPagado = parseFloat(sumPagos[0].t) || 0;
       await query(env,
         `UPDATE estados_cuenta SET saldo_favor = $1, cerrado = $2 WHERE id = $3`,
-        [parseFloat(prop.abono_inicial), parseFloat(prop.abono_inicial) >= (parseFloat(primerEstado[0].pago_actual) + parseFloat(primerEstado[0].saldo_anterior) + parseFloat(primerEstado[0].intereses)), primerEstado[0].id]
+        [totalPagado, totalPagado >= (parseFloat(primerEstado[0].pago_actual) + parseFloat(primerEstado[0].saldo_anterior) + parseFloat(primerEstado[0].intereses)), primerEstado[0].id]
       );
     }
+    // El abono inicial ya se causó: el propietario pasa a estado activo
+    await query(env, `UPDATE propietarios SET estado = 'activo' WHERE id = $1 AND estado = 'abono_inicial'`, [prop.id]);
   }
 
   return generados;
