@@ -2,10 +2,16 @@
 import { query } from '../db.js';
 
 export async function handleGet(request, env, user) {
+  const url = new URL(request.url);
+  let urbId = user.urbanizacion_id;
+  const override = url.searchParams.get('urbanizacion_id');
+  if (user.rol === 'superadmin' && override) urbId = override;
+
   const rows = await query(env,
     `SELECT * FROM parametros_anio
+     WHERE urbanizacion_id = $1
      ORDER BY anio DESC`,
-    []
+    [urbId]
   );
   return ok(rows);
 }
@@ -64,9 +70,9 @@ export async function handleUpdate(request, env, user, id) {
        dia_generacion_cuota = COALESCE($3, dia_generacion_cuota),
        dia_vencimiento_sin_mora = COALESCE($4, dia_vencimiento_sin_mora),
        dia_inicio_mora = COALESCE($5, dia_inicio_mora)
-     WHERE id = $6
+     WHERE id = $6 AND (urbanizacion_id = $7 OR $8::boolean)
      RETURNING *`,
-    [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), id]
+    [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), id, user.urbanizacion_id, user.rol === 'superadmin']
   );
   if (!rows.length) return err(404, 'Registro de configuración no encontrado');
 

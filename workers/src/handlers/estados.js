@@ -26,10 +26,11 @@ async function conciliarPagos(env, propietarioId) {
       const fd = new Date(pg.fecha_pago);
       const anioP = fd.getFullYear();
       const mesP = fd.getMonth() + 1;
-      const propRow = await query(env, `SELECT cuota_admon FROM propietarios WHERE id = $1`, [propietarioId]);
+      const propRow = await query(env, `SELECT cuota_admon, urbanizacion_id FROM propietarios WHERE id = $1`, [propietarioId]);
       const paramCuota = await query(env,
-        `SELECT cuota_admon FROM parametros_anio WHERE anio = $1 ORDER BY anio DESC LIMIT 1`,
-        [anioP]
+        `SELECT cuota_admon FROM parametros_anio
+         WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
+        [propRow[0].urbanizacion_id, anioP]
       );
       const cuota = (paramCuota.length && parseFloat(paramCuota[0].cuota_admon) > 0)
         ? parseFloat(paramCuota[0].cuota_admon) : (parseFloat(propRow[0].cuota_admon) || 0);
