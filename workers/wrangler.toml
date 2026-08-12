@@ -17,5 +17,9 @@ binding = "ASSETS"
 [vars]
 FRONTEND_URL = "https://nassau-api.policomputo.workers.dev"
 
+# Secrets requeridos. Se suben con: wrangler deploy --secrets-file .env.production
+[secrets]
+required = ["JWT_SECRET"]
+
 [triggers]
 crons = ["0 6 1 * *"]

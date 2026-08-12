@@ -8,15 +8,21 @@ export async function handleGetAll(request, env, user) {
 
   if (!urbId) return err(400, 'Urbanización no especificada');
 
-  let sql = `SELECT * FROM propietarios WHERE urbanizacion_id = $1`;
+  let sql = `SELECT p.*, (
+      SELECT pg.comprobante FROM pagos pg
+      WHERE pg.propietario_id = p.id AND pg.comprobante IS NOT NULL AND pg.comprobante <> ''
+      ORDER BY pg.fecha_pago DESC, pg.created_at DESC LIMIT 1
+    ) AS ultimo_comprobante
+    FROM propietarios p
+    WHERE p.urbanizacion_id = $1`;
   const params = [urbId];
 
   if (search) {
-    sql += ` AND (nombre_propietario ILIKE $2 OR apartamento ILIKE $2 OR no_celda ILIKE $2)`;
+    sql += ` AND (p.nombre_propietario ILIKE $2 OR p.apartamento ILIKE $2 OR p.no_celda ILIKE $2)`;
     params.push(`%${search}%`);
   }
 
-  sql += ` ORDER BY apartamento ASC`;
+  sql += ` ORDER BY p.apartamento ASC`;
   const rows = await query(env, sql, params);
   return ok(rows);
 }

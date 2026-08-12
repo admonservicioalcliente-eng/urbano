@@ -10,7 +10,7 @@ window.NassauPropietarios = {
             </div>
             <div class="card table-container">
                 <table class="premium-table" id="props-table">
-                    <thead><tr><th>Apartamento</th><th>Prefijo</th><th>Celda</th><th>Nombre</th><th>Cuota Admon</th><th>Modo Pago</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Apartamento</th><th>Prefijo Doc</th><th>Celda</th><th>Nombre</th><th>Cuota Admon</th><th>Modo Pago</th><th>Estado</th><th>Último Comprobante</th><th>Acciones</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -42,6 +42,7 @@ window.NassauPropietarios = {
                     </select>
                     <button class="btn-primary btn-sm prop-estado-update" data-id="${p.id}" style="display:none;">Actualizar</button>
                 </td>
+                <td>${p.ultimo_comprobante || '-'}</td>
                 <td>
                     <button class="btn-secondary btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.showEditModal(this.dataset.id)">Editar</button>
                     <button class="btn-danger btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.deletePropietario(this.dataset.id)">Eliminar</button>
