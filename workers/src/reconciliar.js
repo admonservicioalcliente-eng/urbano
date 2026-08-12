@@ -93,4 +93,19 @@ export async function reconciliarPagos(env, propietarioId) {
       [totalPagado - aplicado, last.id]
     );
   }
+
+  // 4. Estado del propietario: si ya no debe nada (cero o saldo a favor) pasa a
+  //    ACTIVO. Nunca se altera un propietario 'inactivo'.
+  const deudaRows = await query(env,
+    `SELECT COALESCE(SUM(total_deuda), 0) AS deuda
+     FROM estados_cuenta
+     WHERE propietario_id = $1 AND cerrado = false`,
+    [propietarioId]
+  );
+  if (parseFloat(deudaRows[0].deuda) <= 0) {
+    await query(env,
+      `UPDATE propietarios SET estado = 'activo' WHERE id = $1 AND estado <> 'inactivo'`,
+      [propietarioId]
+    );
+  }
 }

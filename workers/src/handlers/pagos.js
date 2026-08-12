@@ -144,7 +144,7 @@ export async function handleCreate(request, env, user) {
   const deudaRestante = parseFloat(deudaRows[0].deuda);
   const nuevoEstado = deudaRestante > 0 ? 'moroso' : 'activo';
 
-  await query(env, `UPDATE propietarios SET estado = $1 WHERE id = $2`, [nuevoEstado, propietario_id]);
+  await query(env, `UPDATE propietarios SET estado = $1 WHERE id = $2 AND estado <> 'inactivo'`, [nuevoEstado, propietario_id]);
 
   return ok(pago, 201);
 }
@@ -181,7 +181,7 @@ export async function handleDelete(request, env, user, id) {
   );
   const deudaRestante = parseFloat(deudaRows[0].deuda);
   const nuevoEstado = deudaRestante > 0 ? 'moroso' : 'activo';
-  await query(env, `UPDATE propietarios SET estado = $1 WHERE id = $2`, [nuevoEstado, pago.propietario_id]);
+  await query(env, `UPDATE propietarios SET estado = $1 WHERE id = $2 AND estado <> 'inactivo'`, [nuevoEstado, pago.propietario_id]);
 
   return ok({ message: 'Pago revertido correctamente' });
 }
