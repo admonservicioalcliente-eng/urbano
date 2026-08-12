@@ -10,3 +10,6 @@ Thumbs.db
 # Test scripts with credentials
 workers/migrate.js
 workers/test-pago.js
+
+# Portable PHP runtime (el proyecto se ejecuta con PHP instalado aparte)
+php/
