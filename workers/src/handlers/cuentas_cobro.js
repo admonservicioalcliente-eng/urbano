@@ -1,5 +1,6 @@
 // handlers/cuentas_cobro.js — Consecutivos y generación de registros de cuentas de cobro NAS##
 import { query } from '../db.js';
+import { reconciliarPagos } from '../reconciliar.js';
 
 export async function handleGetAll(request, env, user) {
   const url = new URL(request.url);
@@ -87,7 +88,9 @@ export async function handleCreate(request, env, user) {
   const codigoDoc = `${prefijo}${String(proximo).padStart(3, '0')}`;
 
   // Reconciliar pagos y recalcular intereses al día antes de la snapshot
+  await reconciliarPagos(env, propietario_id);
   await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
+  await reconciliarPagos(env, propietario_id);
 
   // Traer TODOS los estados (abiertos y cerrados) para el cuerpo de la CC:
   // el primer mes del propietario (mes de inicio) queda cerrado cuando el

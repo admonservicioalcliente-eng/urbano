@@ -1,5 +1,6 @@
 // handlers/pagos.js — Registros y visualización de pagos
 import { query } from '../db.js';
+import { reconciliarPagos } from '../reconciliar.js';
 
 export async function handleGetAll(request, env, user) {
   const url = new URL(request.url);
@@ -128,33 +129,9 @@ export async function handleCreate(request, env, user) {
 
   const pago = pRows[0];
 
-  // Si se asocia a un estado de cuenta, actualizar su distribución
-  if (estadoCuentaId) {
-    // 1. Obtener estado de cuenta actual
-    const ecRows = await query(env, `SELECT * FROM estados_cuenta WHERE id = $1`, [estadoCuentaId]);
-    if (ecRows.length) {
-      const ec = ecRows[0];
-      const totalDeudaActual = parseFloat(ec.pago_actual) + parseFloat(ec.saldo_anterior) + parseFloat(ec.intereses);
-      
-      // 2. Sumar todos los pagos a este estado de cuenta
-      const sumRows = await query(env, `SELECT SUM(monto) as total FROM pagos WHERE estado_cuenta_id = $1`, [estadoCuentaId]);
-      const totalPagado = parseFloat(sumRows[0].total) || 0;
-
-      let nuevoSaldoFavor = 0;
-      if (totalPagado > 0) {
-        nuevoSaldoFavor = totalPagado;
-      }
-
-      // 3. Actualizar el estado de cuenta
-      await query(env,
-        `UPDATE estados_cuenta SET
-          saldo_favor = $1,
-          cerrado = CASE WHEN $2 >= $3 THEN true ELSE false END
-        WHERE id = $4`,
-        [nuevoSaldoFavor, totalPagado, totalDeudaActual, estadoCuentaId]
-      );
-    }
-  }
+  // Reconciliar: distribuye el pago FIFO sobre los meses (deuda más antigua
+  // primero) y cierra cada mes cuya cuota quedó cubierta.
+  await reconciliarPagos(env, propietario_id);
 
   // ── Auto-actualizar estado del propietario (activo / moroso) ────────────────
   // Obtener sumatoria de deudas pendientes
@@ -191,30 +168,9 @@ export async function handleDelete(request, env, user, id) {
   // Borrar el pago
   await query(env, `DELETE FROM pagos WHERE id = $1`, [id]);
 
-  // Si estaba asociado a un estado de cuenta, recalcular
-  if (pago.estado_cuenta_id) {
-    const ecRows = await query(env, `SELECT * FROM estados_cuenta WHERE id = $1`, [pago.estado_cuenta_id]);
-    if (ecRows.length) {
-      const ec = ecRows[0];
-      const totalDeudaActual = parseFloat(ec.pago_actual) + parseFloat(ec.saldo_anterior) + parseFloat(ec.intereses);
-
-      const sumRows = await query(env, `SELECT SUM(monto) as total FROM pagos WHERE estado_cuenta_id = $1`, [pago.estado_cuenta_id]);
-      const totalPagado = parseFloat(sumRows[0].total) || 0;
-
-      let nuevoSaldoFavor = 0;
-      if (totalPagado > 0) {
-        nuevoSaldoFavor = totalPagado;
-      }
-
-      await query(env,
-        `UPDATE estados_cuenta SET
-          saldo_favor = $1,
-          cerrado = CASE WHEN $2 >= $3 THEN true ELSE false END
-        WHERE id = $4`,
-        [nuevoSaldoFavor, totalPagado, totalDeudaActual, pago.estado_cuenta_id]
-      );
-    }
-  }
+  // Reconciliar de nuevo: redistribuye los pagos restantes y reabre meses
+  // si la deuda ya no está cubierta.
+  await reconciliarPagos(env, pago.propietario_id);
 
   // Recalcular estado propietario
   const deudaRows = await query(env,
