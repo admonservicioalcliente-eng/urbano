@@ -1,5 +1,5 @@
-const CACHE_NAME = 'nassau-v12';
-const urlsToCache = ['/', '/css/main.css', '/js/api.js', '/js/auth.js', '/js/app.js', '/js/modules/propietarios.js', '/js/modules/pagos.js', '/js/modules/estados.js', '/js/modules/documentos.js', '/js/modules/configuracion.js', '/js/modules/superadmin.js'];
+const CACHE_NAME = 'nassau-v14';
+const urlsToCache = ['/', '/css/main.css', '/js/api.js', '/js/auth.js', '/js/app.js', '/js/lib/jspdf.umd.min.js', '/js/modules/propietarios.js', '/js/modules/pagos.js', '/js/modules/estados.js', '/js/modules/documentos.js', '/js/modules/configuracion.js', '/js/modules/superadmin.js'];
 
 self.addEventListener('install', event => {
   self.skipWaiting();

@@ -3,6 +3,20 @@ window.NassauApp = {
         this.setupNavigation();
         this.setupModals();
         window.NassauAuth.initAuth();
+        this.loadSidebarLogo();
+    },
+    async loadSidebarLogo() {
+        const img = document.getElementById('sidebar-logo-img');
+        if (!img) return;
+        const urbId = localStorage.getItem('nassau_urb_id');
+        if (!urbId) return;
+        try {
+            const data = await window.NassauAPI.apiGet(`/urbanizaciones/${urbId}/logo`);
+            if (data.logo) {
+                img.src = data.logo;
+                img.onerror = () => { img.src = '/assets/logo.jpg'; };
+            }
+        } catch(e) {}
     },
     setupNavigation() {
         document.querySelectorAll('.nav-link').forEach(link => {

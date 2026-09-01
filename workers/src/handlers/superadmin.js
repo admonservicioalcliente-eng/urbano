@@ -6,7 +6,7 @@ export async function handleRegistroUrbanizacion(request, env) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { nombre, direccion, telefono, email, prefijo_doc, admin_nombre, admin_email, admin_password } = body;
+  const { nombre, direccion, telefono, email, prefijo_doc, admin_nombre, admin_email, admin_password, logo_base64 } = body;
   if (!nombre) return err(400, 'El nombre de la urbanización es obligatorio');
   if (!admin_nombre || !admin_email || !admin_password) return err(400, 'Nombre, email y contraseña del administrador son obligatorios');
   if (admin_password.length < 8) return err(400, 'La contraseña debe tener al menos 8 caracteres');
@@ -18,9 +18,9 @@ export async function handleRegistroUrbanizacion(request, env) {
     if (existing.length) return err(400, 'Ya existe un usuario con ese email');
 
     const urb = await query(env,
-      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc)
-       VALUES ($1, $2, $3, $4, 'pendiente', $5) RETURNING *`,
-      [nombre.trim(), direccion || null, telefono || null, email || null, (prefijo_doc || 'NAS').toUpperCase().substring(0, 10)]
+      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc, logo_base64)
+       VALUES ($1, $2, $3, $4, 'pendiente', $5, $6) RETURNING *`,
+      [nombre.trim(), direccion || null, telefono || null, email || null, (prefijo_doc || 'NAS').toUpperCase().substring(0, 10), logo_base64 || null]
     );
 
     const usr = await query(env,
@@ -92,6 +92,26 @@ export async function handleGetStats(request, env, user) {
     total_usuarios: parseInt(users[0].count) || 0,
     total_propietarios: parseInt(props[0].count) || 0
   });
+}
+
+export async function handleUpdateLogo(request, env, user, id) {
+  if (user.rol !== 'superadmin') return err(403, 'Acceso denegado');
+
+  let body;
+  try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
+
+  const { logo_base64 } = body;
+  if (logo_base64 && logo_base64.length > 1000000) {
+    return err(400, 'El logo no debe exceder 700 KB');
+  }
+
+  const rows = await query(env,
+    `UPDATE urbanizaciones SET logo_base64 = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+    [logo_base64 || null, id]
+  );
+
+  if (!rows.length) return err(404, 'Urbanización no encontrada');
+  return ok(rows[0]);
 }
 
 const ok = (data, status = 200) => Response.json({ ok: true, data }, { status });

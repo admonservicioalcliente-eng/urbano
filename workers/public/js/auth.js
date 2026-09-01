@@ -13,15 +13,31 @@ window.NassauAuth = {
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-shell').style.display = 'none';
         const select = document.getElementById('login-urb');
+        const logoImg = document.getElementById('login-logo-img');
         try {
             const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
             if(select && Array.isArray(urbs) && urbs.length) {
                 select.innerHTML = urbs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
                 if (urbs.length === 1) select.value = urbs[0].id;
+                this.loadLoginLogo(urbs[0].id);
+                select.addEventListener('change', () => this.loadLoginLogo(select.value));
             } else throw new Error('empty');
         } catch (e) {
             if(select) select.innerHTML = '<option value="a1b2c3d4-0001-0001-0001-000000000001">Edificio Nassau P.H.</option>';
         }
+    },
+    async loadLoginLogo(urbId) {
+        const logoImg = document.getElementById('login-logo-img');
+        if (!logoImg) return;
+        try {
+            const data = await window.NassauAPI.apiGet(`/urbanizaciones/${urbId}/logo`);
+            if (data.logo) {
+                logoImg.src = data.logo;
+                logoImg.onerror = () => { logoImg.src = '/assets/logo.jpg'; };
+            } else {
+                logoImg.src = '/assets/logo.jpg';
+            }
+        } catch(e) { logoImg.src = '/assets/logo.jpg'; }
     },
     async login(email, password, urb_id, cf_token) {
         try {
@@ -97,6 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             try {
                 window.NassauApp?.showLoading(true);
+                const logoFile = document.getElementById('reg-logo').files[0];
+                let logo_base64 = null;
+                if (logoFile) {
+                    if (logoFile.size > 700000) { window.NassauApp?.showToast('El logo no debe exceder 700 KB', 'error'); return; }
+                    logo_base64 = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.readAsDataURL(logoFile);
+                    });
+                }
                 await window.NassauAPI.apiPost('/registro-urbanizacion', {
                     nombre: document.getElementById('reg-nombre').value,
                     direccion: document.getElementById('reg-direccion').value,
@@ -105,7 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     prefijo_doc: document.getElementById('reg-prefijo').value,
                     admin_nombre: document.getElementById('reg-admin-nombre').value,
                     admin_email: document.getElementById('reg-admin-email').value,
-                    admin_password: document.getElementById('reg-admin-password').value
+                    admin_password: document.getElementById('reg-admin-password').value,
+                    logo_base64
                 });
                 window.NassauApp?.showToast('Registro solicitado. El SUPERADMIN aprobará su urbanización y podrá iniciar sesión.', 'success');
                 regForm.reset();

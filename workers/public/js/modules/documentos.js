@@ -44,8 +44,88 @@ window.NassauDocumentos = {
             window.NassauEstados.renderPage(prop.id, new Date().getFullYear());
         });
     },
+    async generarReciboPago(pago, prop) {
+        if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'letter');
+
+        const urbNombre = localStorage.getItem('nassau_urb_nombre') || 'EDIFICIO NASSAU P.H.';
+        const logo = await this.loadLogo();
+        const mesNames = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+        const W = doc.internal.pageSize.getWidth();
+        const H = doc.internal.pageSize.getHeight();
+        const M = 12;
+        const RIGHT = W - M;
+
+        const fecha = pago.fecha_pago ? new Date(pago.fecha_pago) : new Date();
+        const fechaStr = `${fecha.getDate()}/${fecha.getMonth() + 1}/${fecha.getFullYear()}`;
+        const tipo = (pago.tipo_pago || 'cuota_regular').replace('_', ' ');
+        const monto = Number(pago.monto) || 0;
+        const comprobante = pago.comprobante || 'NAS-0000';
+
+        const tipoMap = { 'cuota regular': 'Cuota de Administración', 'cuota extra': 'Cuota Extra', 'intereses': 'Intereses', 'abono': 'Abono' };
+        const concepto = tipoMap[tipo] || tipo;
+
+        doc.setGState(new doc.GState({ opacity: 0.1 }));
+        doc.setTextColor(0, 150, 150);
+        doc.setFontSize(70); doc.setFont('helvetica', 'bold');
+        doc.text('NASSAU', W / 2, H / 2, { align: 'center', angle: 45 });
+        doc.setFontSize(40);
+        doc.text('P.H.', W / 2, H / 2 + 35, { align: 'center', angle: 45 });
+        doc.setGState(new doc.GState({ opacity: 1 }));
+        doc.setTextColor(0, 0, 0);
+
+        if (logo) { try { doc.addImage(logo, 'JPEG', M, 12, 18, 18); } catch(e) { console.warn('Logo no válido', e); } }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+        doc.text(urbNombre, M + 22, 17);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.text('Recibo de pago de administración', M + 22, 21);
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(200, 0, 0);
+        doc.text(`COMPROBANTE No: ${comprobante}`, RIGHT, 17, { align: 'right' });
+        doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+        doc.text(`Fecha de pago: ${fechaStr}`, RIGHT, 22, { align: 'right' });
+
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5); doc.line(M, 32, RIGHT, 32);
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text('Señor(a):', M, 40);
+        doc.setFont('helvetica', 'normal');
+        doc.text((prop?.nombre_propietario || '').toUpperCase(), M + 32, 40);
+        doc.setFont('helvetica', 'bold'); doc.text('Apartamento:', M, 46);
+        doc.setFont('helvetica', 'normal'); doc.text(prop?.apartamento || '', M + 32, 46);
+
+        doc.setFont('helvetica', 'bold'); doc.text('Concepto:', M, 52);
+        doc.setFont('helvetica', 'normal'); doc.text(concepto.toUpperCase(), M + 32, 52);
+        if (pago.descripcion) {
+            doc.setFont('helvetica', 'bold'); doc.text('Descripción:', M, 58);
+            doc.setFont('helvetica', 'normal'); doc.text(pago.descripcion, M + 32, 58);
+        }
+
+        doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.6); doc.line(M, 66, RIGHT, 66);
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        doc.text('VALOR PAGADO:', RIGHT, 76, { align: 'right' });
+        doc.setFontSize(16); doc.setTextColor(0, 150, 150);
+        doc.text(`$${monto.toLocaleString()}`, RIGHT, 82, { align: 'right' });
+        doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
+
+        doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.6); doc.line(M, 88, RIGHT, 88);
+
+        doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(8.5); doc.setTextColor(0, 150, 150);
+        doc.text('¡GRACIAS POR SU PAGO CUMPLIDO!', W / 2, 100, { align: 'center' });
+        doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
+
+        doc.save(`Comprobante-${comprobante}.pdf`);
+    },
     async loadLogo() {
-        // Cargar logo de la urbanización como base64 para el PDF
+        const urbId = localStorage.getItem('nassau_urb_id');
+        if (urbId) {
+            try {
+                const data = await window.NassauAPI.apiGet(`/urbanizaciones/${urbId}/logo`);
+                if (data.logo) return data.logo;
+            } catch(e) { console.warn('Logo desde API no disponible', e); }
+        }
         try {
             const resp = await fetch('/assets/logo.jpg');
             const blob = await resp.blob();

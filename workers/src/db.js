@@ -22,3 +22,16 @@ export async function query(env, sqlText, params = []) {
     await sql.end();
   }
 }
+
+let migrated = false;
+export async function ensureMigrations(env) {
+  if (migrated) return;
+  try {
+    const connectionString = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
+    const sql = postgres(connectionString, { max: 1 });
+    try {
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS logo_base64 TEXT`);
+      migrated = true;
+    } finally { await sql.end(); }
+  } catch (e) { console.error('Migration error:', e.message); }
+}

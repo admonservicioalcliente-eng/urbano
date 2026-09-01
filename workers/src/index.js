@@ -1,4 +1,5 @@
 import { authMiddleware } from './auth.js';
+import { ensureMigrations } from './db.js';
 import * as authHandler from './handlers/auth.js';
 import * as propietariosHandler from './handlers/propietarios.js';
 import * as pagosHandler from './handlers/pagos.js';
@@ -34,6 +35,8 @@ export default {
     const method = request.method;
 
     try {
+      await ensureMigrations(env);
+
       // Public routes
       if (path === '/api/auth/login' && method === 'POST') {
         const res = await authHandler.handleLogin(request, env);
@@ -54,6 +57,21 @@ export default {
           return jsonResponse(rows, 200, env);
         } catch (err) {
           return jsonResponse([], 200, env);
+        }
+      }
+
+      // Public: logo de urbanización (para pantalla de login)
+      if (path.match(/^\/api\/urbanizaciones\/[^/]+\/logo$/) && method === 'GET') {
+        const urbId = path.split('/')[3];
+        try {
+          const { query } = await import('./db.js');
+          const rows = await query(env, 'SELECT logo_base64 FROM urbanizaciones WHERE id = $1', [urbId]);
+          if (rows.length && rows[0].logo_base64) {
+            return jsonResponse({ logo: rows[0].logo_base64 }, 200, env);
+          }
+          return jsonResponse({ logo: null }, 200, env);
+        } catch (err) {
+          return jsonResponse({ logo: null }, 200, env);
         }
       }
 
@@ -105,6 +123,7 @@ export default {
         if (method === 'GET') res = await superadminHandler.handleGetUrbanizaciones(request, env, user);
         else if (method === 'POST') res = await superadminHandler.handleCreateUrbanizacion(request, env, user);
         else if (method === 'PUT' && resourceId && subAction === 'estado') res = await superadminHandler.handleUpdateEstado(request, env, user, resourceId);
+        else if (method === 'PUT' && resourceId && subAction === 'logo') res = await superadminHandler.handleUpdateLogo(request, env, user, resourceId);
       } else if (path.startsWith('/api/usuarios')) {
         if (method === 'GET') res = await usuariosHandler.handleGetAll(request, env, user);
         else if (method === 'POST') res = await usuariosHandler.handleCreate(request, env, user);

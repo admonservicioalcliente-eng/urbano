@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="/css/main.css">
     
     <!-- jsPDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="/js/lib/jspdf.umd.min.js"></script>
 </head>
 <body>
     <!-- Loading Spinner -->
@@ -31,7 +31,7 @@
     <!-- Login Screen -->
     <div id="login-screen">
         <div class="login-card">
-            <img src="/assets/logo.jpg" alt="Logo" class="login-logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCI+PGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiMzMzMiLz48L3N2Zz4='">
+            <img id="login-logo-img" src="/assets/logo.jpg" alt="Logo" class="login-logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCI+PGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiMzMzMiLz48L3N2Zz4='">
             <h2>Nassau P.H.</h2>
             <form id="login-form">
                 <div class="form-group">
@@ -68,6 +68,10 @@
                     <input type="email" id="reg-email">
                 </div>
                 <div class="form-group">
+                    <label>Logo del edificio (mín. 200x200 px, JPG/PNG, máx. 700 KB)</label>
+                    <input type="file" id="reg-logo" accept="image/jpeg,image/png" class="search-input">
+                </div>
+                <div class="form-group">
                     <label>Prefijo de documentos</label>
                     <input type="text" id="reg-prefijo" value="NAS" maxlength="10">
                 </div>
@@ -94,7 +98,7 @@
         <nav class="sidebar">
             <div class="brand">
                 <div class="login-logo" style="width:40px; height:40px; margin-bottom:0;">
-                    <img src="/assets/logo.jpg" alt="Logo" style="width:100%; border-radius:50%;" onerror="this.style.display='none'">
+                    <img id="sidebar-logo-img" src="/assets/logo.jpg" alt="Logo" style="width:100%; border-radius:50%;" onerror="this.style.display='none'">
                 </div>
                 <span id="app-brand-title">NASSAU P.H.</span>
             </div>
