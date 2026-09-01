@@ -18,6 +18,8 @@
     
     <!-- jsPDF -->
     <script src="/js/lib/jspdf.umd.min.js"></script>
+    <!-- Cloudflare Turnstile -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body>
     <!-- Loading Spinner -->
@@ -45,6 +47,9 @@
                 <div class="form-group">
                     <label>Contraseña</label>
                     <input type="password" id="login-password" required>
+                </div>
+                <div class="form-group">
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAEJxy95MnlU2yWRL"></div>
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%;">Iniciar Sesión</button>
             </form>
