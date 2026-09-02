@@ -212,19 +212,17 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Cuotas de administración mensuales
-            if (detalle && detalle.periodos_pendientes && detalle.periodos_pendientes.length) {
-                detalle.periodos_pendientes.forEach(per => {
-                    rows.push({ label: `Cuota de Administración - ${mesNames[per.mes] || per.mes} ${per.anio}`, value: Number(per.pago_actual || 0), bold: true });
-                });
-            } else if (Number(t.cuota_admon || 0) > 0) {
-                rows.push({ label: 'Cuota de Administración', value: Number(t.cuota_admon) || 0, bold: false });
+            // Deuda anterior (meses pasados no pagados)
+            if (Number(t.deuda_anterior || 0) > 0) {
+                rows.push({ label: 'Deuda anterior (meses pendientes)', value: Number(t.deuda_anterior), bold: false });
             }
 
-            // Saldos anteriores
-            (detalle?.periodos_pendientes || []).filter(p => Number(p.saldo_anterior) > 0).forEach(p => {
-                rows.push({ label: `  Saldo anterior ${mesNames[p.mes] || p.mes} ${p.anio}`, value: Number(p.saldo_anterior), bold: false });
-            });
+            // Cuota de administración del mes actual
+            if (Number(t.cuota_mes_actual || 0) > 0) {
+                rows.push({ label: `Cuota de Administración - ${mesNames[new Date().getMonth() + 1] || ''} ${new Date().getFullYear()}`, value: Number(t.cuota_mes_actual), bold: true });
+            } else if (Number(t.cuota_mes_actual || 0) === 0 && Number(t.cuota_admon || 0) > 0) {
+                rows.push({ label: `Cuota de Administración - ${mesNames[new Date().getMonth() + 1] || ''} ${new Date().getFullYear()}`, value: 0, bold: true });
+            }
 
             // Cuotas extras
             (detalle?.cuotas_extras || []).forEach(e => {

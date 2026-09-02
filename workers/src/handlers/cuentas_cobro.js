@@ -137,25 +137,35 @@ export async function handleCreate(request, env, user) {
   }
 
   let totalCuota = 0, totalInteres = 0, totalSaldoAnt = 0, totalSaldoFavor = 0;
+  let cuotaMesActual = 0, deudaAnterior = 0;
+
   for (const ec of ecs) {
-    totalCuota     += parseFloat(ec.pago_actual) || 0;
-    totalInteres   += parseFloat(ec.intereses) || 0;
-    totalSaldoAnt  += parseFloat(ec.saldo_anterior) || 0;
-    totalSaldoFavor += parseFloat(ec.saldo_favor) || 0;
+    const esMesActual = parseInt(ec.anio) === anioActual && parseInt(ec.mes) === mesActual;
+    const pagoActual = parseFloat(ec.pago_actual) || 0;
+    const saldoAnt = parseFloat(ec.saldo_anterior) || 0;
+    const intereses = parseFloat(ec.intereses) || 0;
+    const saldoFavor = parseFloat(ec.saldo_favor) || 0;
+    const baseMes = pagoActual + saldoAnt + intereses - saldoFavor;
+
+    totalCuota     += pagoActual;
+    totalInteres   += intereses;
+    totalSaldoAnt  += saldoAnt;
+    totalSaldoFavor += saldoFavor;
+
+    if (esMesActual) {
+      cuotaMesActual = Math.max(0, baseMes);
+    } else {
+      deudaAnterior += Math.max(0, baseMes);
+    }
   }
+
   let totalExtras = 0;
   for (const ex of extras) {
     totalExtras += parseFloat(ex.monto) || 0;
   }
 
-  // El cuerpo ahora incluye TODOS los estados, así que el saldo a favor y los
-  // créditos de estados cerrados ya están capturados en totalSaldoFavor (vía
-  // saldo_favor). No se suma crédito adicional para evitar doble descuento.
-  const creditoAcumulado = 0;
-  const saldoFavorTotal = totalSaldoFavor;
-  // El abono inicial ya está aplicado como saldo_favor del primer estado
-  // (sembrarEstadosInicio), así que no debe restarse de nuevo aquí.
-  const totalDeuda = totalCuota + totalSaldoAnt + totalInteres + totalExtras - saldoFavorTotal;
+  // Total = deuda anterior + cuota mes actual + extras
+  const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras;
 
   const detalleJson = {
     urbanizacion: {
@@ -197,6 +207,8 @@ export async function handleCreate(request, env, user) {
       saldo_favor: Math.round(saldoFavorTotal * 100) / 100,
       credito_acumulado: Math.round(creditoAcumulado * 100) / 100,
       abono_inicial: Math.round(abonoAplicado * 100) / 100,
+      deuda_anterior: Math.round(deudaAnterior * 100) / 100,
+      cuota_mes_actual: Math.round(cuotaMesActual * 100) / 100,
       total: Math.round(totalDeuda * 100) / 100
     },
     cuenta_bancaria: {
