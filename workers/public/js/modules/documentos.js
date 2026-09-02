@@ -302,7 +302,7 @@ window.NassauDocumentos = {
                 doc.line(M, y, RIGHT, y);
                 y += 5;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 150, 150);
-                doc.text('SALDO A PAGAR:', M, y);
+                doc.text('ESTADO DE CUENTA:', M, y);
                 doc.text('$0', RIGHT - 12, y, { align: 'right' });
                 doc.setTextColor(0, 0, 0);
                 y += 6;
@@ -327,7 +327,12 @@ window.NassauDocumentos = {
             y += 5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
             const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
-            doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}: $${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, M, y);
+            doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}:`, M, y);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+            doc.text('SALDO A PAGAR', RIGHT - 12, y, { align: 'right' });
+            y += 5;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+            doc.text(`$${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
 
             // ── Pie de copia: CONSIGNACIÓN (compacto) ─────────────────────────
             const yf = Math.max(b + 100, y + 10);
