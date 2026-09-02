@@ -324,7 +324,7 @@ window.NassauDocumentos = {
             y += 5;
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
             doc.text('Cuota de administración mensual:', M, y);
-            doc.text(`$${Number(t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+            doc.text(`$${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
             y += 4.5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
             const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
