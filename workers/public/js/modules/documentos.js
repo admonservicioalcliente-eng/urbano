@@ -212,12 +212,12 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Meses a aplicar (solo pendientes)
+            // Cuotas de administración de los meses pendientes
             (detalle?.periodos_pendientes || []).forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
                 const anio = p.anio || new Date().getFullYear();
                 if (!p.cerrado && Number(p.pendiente || 0) > 0) {
-                    rows.push({ label: `${mesLabel} ${anio}`, value: Number(p.pendiente), bold: false });
+                    rows.push({ label: `Cuota Administración ${mesLabel} ${anio}`, value: Number(p.pendiente), bold: false });
                 }
             });
 
@@ -234,51 +234,44 @@ window.NassauDocumentos = {
             rows.forEach(r => {
                 if (y > b + 80) return;
                 doc.setFont('helvetica', r.bold ? 'bold' : 'normal');
-                const valStr = `$${Math.abs(r.value).toLocaleString()}`;
                 doc.text(r.label, M, y);
-                doc.text(valStr, RIGHT - 12, y, { align: 'right' });
+                doc.text(`$${Math.abs(r.value).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4.3;
             });
 
-            // Línea separadora antes de saldo a favor
+            // Saldo a favor / abonos aplicados
             if (Number(t.saldo_favor || 0) > 0 || Number(t.abono_inicial || 0) > 0) {
                 doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
                 doc.line(M, y, RIGHT, y);
                 y += 3;
+                if (Number(t.saldo_favor || 0) > 0) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Saldo a favor / abonos aplicados', M, y);
+                    doc.text(`-$${Number(t.saldo_favor).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                    y += 4.3;
+                }
+                if (Number(t.abono_inicial || 0) > 0) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Abono inicial', M, y);
+                    doc.text(`-$${Number(t.abono_inicial).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                    y += 4.3;
+                }
             }
 
-            // Saldo a favor / abonos aplicados
-            if (Number(t.saldo_favor || 0) > 0) {
-                doc.setFont('helvetica', 'normal');
-                doc.text('Saldo a favor / abonos aplicados', M, y);
-                doc.text(`-$${Number(t.saldo_favor).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
-            }
-            if (Number(t.abono_inicial || 0) > 0) {
-                doc.setFont('helvetica', 'normal');
-                doc.text('Abono inicial', M, y);
-                doc.text(`-$${Number(t.abono_inicial).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
-            }
-
-            // Línea separadora antes del total
+            // TOTAL A PAGAR
             doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
             doc.line(RIGHT - 12, y, RIGHT, y);
             y += 2;
-
-            // TOTAL A PAGAR
             const totalAMostrar = total <= 0 ? 0 : total;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
             doc.text('TOTAL A PAGAR:', M, y + 3);
             doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
             y += 6;
 
-            // Línea separadora
+            // Cuota de administración del mes actual (dos renglones)
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
             doc.line(M, y, RIGHT, y);
             y += 5;
-
-            // Cuota de administración del mes actual (dos renglones)
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
             doc.text('Cuota de administración mensual:', M, y);
             doc.text(`$${Number(t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
