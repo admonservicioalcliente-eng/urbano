@@ -274,5 +274,13 @@ export async function handleCreate(request, env, user) {
   return ok(created, 201);
 }
 
+export async function handleDeleteAll(request, env, user) {
+  const result = await query(env,
+    `DELETE FROM cuentas_cobro WHERE urbanizacion_id = $1`,
+    [user.urbanizacion_id]
+  );
+  return ok({ deleted: result.count || result.affectedRows || 0 });
+}
+
 const ok = (data, status = 200) => Response.json({ ok: true, data }, { status });
 const err = (status, message) => Response.json({ ok: false, message }, { status });

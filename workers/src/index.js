@@ -127,6 +127,7 @@ export default {
       } else if (path.startsWith('/api/cuentas-cobro')) {
         if (method === 'GET') res = await cuentasCobroHandler.handleGetAll(request, env, user);
         else if (method === 'POST') res = await cuentasCobroHandler.handleCreate(request, env, user);
+        else if (method === 'DELETE') res = await cuentasCobroHandler.handleDeleteAll(request, env, user);
       } else if (path.startsWith('/api/parametros')) {
         if (method === 'GET') res = await parametrosHandler.handleGet(request, env, user);
         else if (method === 'POST') res = await parametrosHandler.handleCreate(request, env, user);
