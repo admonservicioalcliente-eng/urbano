@@ -318,14 +318,10 @@ window.NassauDocumentos = {
                 y += 6;
             }
 
-            // Cuota de administración del mes actual (dos renglones)
+            // Cuota de administración del mes actual
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
             doc.line(M, y, RIGHT, y);
             y += 5;
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-            doc.text('Cuota de administración mensual:', M, y);
-            doc.text(`$${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-            y += 4.5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
             const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
             doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}: $${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, M, y);
