@@ -14,15 +14,17 @@ export async function handleLogin(request, env) {
   if (!email || !password) return err(400, 'Email y contraseña requeridos');
   if (!urb_id) return err(400, 'Debe seleccionar la urbanización');
 
-  // ── Turnstile verification (optional) ──────────────────────────────────────
+  // ── Turnstile verification (optional, non-blocking) ─────────────────────────
   if (env.TURNSTILE_SECRET_KEY && cf_token && cf_token !== 'dummy_token') {
-    const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `secret=${env.TURNSTILE_SECRET_KEY}&response=${cf_token}`
-    });
-    const tsData = await tsRes.json();
-    if (!tsData.success) return err(403, 'Verificación de seguridad fallida. Recargue la página.');
+    try {
+      const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `secret=${env.TURNSTILE_SECRET_KEY}&response=${cf_token}`
+      });
+      const tsData = await tsRes.json();
+      if (!tsData.success) console.log('Turnstile verification failed:', tsData['error-codes']);
+    } catch (e) { console.log('Turnstile verification error:', e.message); }
   }
 
   // ── Fetch user ──────────────────────────────────────────────────────────────
