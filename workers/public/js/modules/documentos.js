@@ -237,10 +237,9 @@ window.NassauDocumentos = {
             if (Number(t.abono_inicial || 0) > 0) {
                 rows.push({ label: 'Abono inicial', value: -Number(t.abono_inicial), bold: false });
             }
-            // Saldo a favor / abonos (sin contar el abono inicial, que ya se lista arriba)
-            const saldoFavorRestante = Number(t.saldo_favor || 0) - Number(t.abono_inicial || 0);
-            if (saldoFavorRestante > 0) {
-                rows.push({ label: 'Saldo a favor / abonos aplicados', value: -saldoFavorRestante, bold: false });
+            // Saldo a favor / crédito disponible
+            if (Number(t.saldo_favor || 0) > 0) {
+                rows.push({ label: 'Saldo a favor / crédito', value: -Number(t.saldo_favor), bold: false });
             }
 
             rows.forEach(r => {
