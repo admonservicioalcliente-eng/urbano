@@ -77,9 +77,11 @@ export async function reconciliarPagos(env, propietarioId) {
     const base = parseFloat(ec.pago_actual) + parseFloat(ec.saldo_anterior) + parseFloat(ec.intereses);
     const disponible = Math.max(0, totalPagado - aplicado);
     const aplicadoMes = Math.min(base, disponible);
+    // saldo_favor solo se registra si hay EXCEDENTE (pago > deuda del mes)
+    const excedenteMes = Math.max(0, aplicadoMes - base);
     await query(env,
       `UPDATE estados_cuenta SET saldo_favor = $1, cerrado = $2 WHERE id = $3`,
-      [aplicadoMes, aplicadoMes >= base, ec.id]
+      [excedenteMes, aplicadoMes >= base, ec.id]
     );
     aplicado += aplicadoMes;
   }
@@ -114,7 +116,10 @@ export async function reconciliarPagos(env, propietarioId) {
         [nuevoSaldoAnterior, ec.id]
       );
     }
-    deudaAcumulada += deudaMes;
+    // Meses cerrados (pagados) no contribuyen a deuda acumulada
+    if (!ec.cerrado) {
+      deudaAcumulada += deudaMes;
+    }
   }
 
   // 5. Estado del propietario: si ya no debe nada (cero o saldo a favor) pasa a

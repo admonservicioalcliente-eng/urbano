@@ -146,13 +146,16 @@ export async function handleCreate(request, env, user) {
     const intereses = parseFloat(ec.intereses) || 0;
     const saldoFavor = parseFloat(ec.saldo_favor) || 0;
     const baseMes = pagoActual + saldoAnt + intereses - saldoFavor;
+    const cerrado = ec.cerrado === true;
 
     totalCuota     += pagoActual;
     totalInteres   += intereses;
     totalSaldoAnt  += saldoAnt;
     totalSaldoFavor += saldoFavor;
 
-    if (esMesActual) {
+    if (cerrado) {
+      // Mes cerrado = pagado, no genera deuda
+    } else if (esMesActual) {
       cuotaMesActual = Math.max(0, baseMes);
     } else {
       deudaAnterior += Math.max(0, baseMes);
@@ -179,16 +182,25 @@ export async function handleCreate(request, env, user) {
       apartamento: prop.apartamento,
       cuota_admon: prop.cuota_admon
     },
-    periodos_pendientes: ecs.map(e => ({
-      anio: e.anio,
-      mes: e.mes,
-      pago_actual: e.pago_actual,
-      saldo_anterior: e.saldo_anterior,
-      intereses: e.intereses,
-      saldo_favor: e.saldo_favor,
-      dias_mora: e.dias_mora,
-      total_periodo: parseFloat(e.pago_actual) + parseFloat(e.saldo_anterior) + parseFloat(e.intereses) - parseFloat(e.saldo_favor)
-    })),
+    periodos_pendientes: ecs.map(e => {
+      const base = parseFloat(e.pago_actual) + parseFloat(e.saldo_anterior) + parseFloat(e.intereses);
+      const favor = parseFloat(e.saldo_favor) || 0;
+      const pagado = e.cerrado ? base : 0;
+      const pendiente = e.cerrado ? 0 : Math.max(0, base - favor);
+      return {
+        anio: e.anio,
+        mes: e.mes,
+        pago_actual: e.pago_actual,
+        saldo_anterior: e.saldo_anterior,
+        intereses: e.intereses,
+        saldo_favor: e.saldo_favor,
+        dias_mora: e.dias_mora,
+        cerrado: e.cerrado,
+        pagado: pagado,
+        pendiente: pendiente,
+        total_periodo: pendiente
+      };
+    }),
     cuotas_extras: extras.map(ex => ({
       descripcion: ex.descripcion,
       monto: ex.monto,
