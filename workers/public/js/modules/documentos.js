@@ -212,81 +212,94 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Detalle mes a mes
+            // Meses a aplicar (solo pendientes)
             (detalle?.periodos_pendientes || []).forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
                 const anio = p.anio || new Date().getFullYear();
-                if (p.cerrado && Number(p.pagado || 0) > 0) {
-                    rows.push({ label: `${mesLabel} ${anio} (pagado)`, value: Number(p.pagado), bold: false, paid: true });
-                } else if (Number(p.pendiente || 0) > 0) {
-                    rows.push({ label: `${mesLabel} ${anio}`, value: Number(p.pendiente), bold: false, paid: false });
+                if (!p.cerrado && Number(p.pendiente || 0) > 0) {
+                    rows.push({ label: `${mesLabel} ${anio}`, value: Number(p.pendiente), bold: false });
                 }
             });
 
-            // Cuotas extras
+            // Cuotas extras pendientes
             (detalle?.cuotas_extras || []).forEach(e => {
-                rows.push({ label: `Cuota extra: ${e.descripcion || ''}`, value: Number(e.monto || 0), bold: false, paid: false });
+                rows.push({ label: `Cuota extra: ${e.descripcion || ''}`, value: Number(e.monto || 0), bold: false });
             });
 
             // Intereses
             if (Number(t.intereses || 0) > 0) {
-                rows.push({ label: 'Intereses causados', value: Number(t.intereses), bold: false, paid: false });
-            }
-            // Abono inicial (primera cuenta de cobro de propietario nuevo)
-            if (Number(t.abono_inicial || 0) > 0) {
-                rows.push({ label: 'Abono inicial', value: -Number(t.abono_inicial), bold: false, paid: false });
-            }
-            // Saldo a favor / crédito disponible
-            if (Number(t.saldo_favor || 0) > 0) {
-                rows.push({ label: 'Saldo a favor / crédito', value: -Number(t.saldo_favor), bold: false, paid: false });
+                rows.push({ label: 'Intereses causados', value: Number(t.intereses), bold: false });
             }
 
             rows.forEach(r => {
-                if (y > b + 96) return; // evita desbordar la mitad
+                if (y > b + 80) return;
                 doc.setFont('helvetica', r.bold ? 'bold' : 'normal');
-                if (r.paid) doc.setTextColor(100, 100, 100); // gris para pagados
-                const valStr = r.value < 0 ? `-$${Math.abs(r.value).toLocaleString()}` : `$${Math.abs(r.value).toLocaleString()}`;
+                const valStr = `$${Math.abs(r.value).toLocaleString()}`;
                 doc.text(r.label, M, y);
                 doc.text(valStr, RIGHT - 12, y, { align: 'right' });
-                doc.setTextColor(0, 0, 0);
                 y += 4.3;
             });
 
-            // Saldo a favor neto: cuando el total calculado es negativo
-            const saldoAFavor = total < 0 ? -total : 0;
-            const totalAMostrar = total <= 0 ? 0 : total;
+            // Línea separadora antes de saldo a favor
+            if (Number(t.saldo_favor || 0) > 0 || Number(t.abono_inicial || 0) > 0) {
+                doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
+                doc.line(M, y, RIGHT, y);
+                y += 3;
+            }
 
+            // Saldo a favor / abonos aplicados
+            if (Number(t.saldo_favor || 0) > 0) {
+                doc.setFont('helvetica', 'normal');
+                doc.text('Saldo a favor / abonos aplicados', M, y);
+                doc.text(`-$${Number(t.saldo_favor).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4.3;
+            }
+            if (Number(t.abono_inicial || 0) > 0) {
+                doc.setFont('helvetica', 'normal');
+                doc.text('Abono inicial', M, y);
+                doc.text(`-$${Number(t.abono_inicial).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4.3;
+            }
+
+            // Línea separadora antes del total
             doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
             doc.line(RIGHT - 12, y, RIGHT, y);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+            y += 2;
 
-            if (saldoAFavor > 0) {
-                doc.setTextColor(16, 185, 129); // verde
-            }
-            doc.text('TOTAL A PAGAR:', M, y + 3.5);
-            doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3.5, { align: 'right' });
-            doc.setTextColor(0, 0, 0);
+            // TOTAL A PAGAR
+            const totalAMostrar = total <= 0 ? 0 : total;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+            doc.text('TOTAL A PAGAR:', M, y + 3);
+            doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+            y += 6;
 
-            // Cuota de administración del mes actual (abajo, dos renglones)
-            const yCuota = y + 8;
+            // Línea separadora
+            doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
+            doc.line(M, y, RIGHT, y);
+            y += 5;
+
+            // Cuota de administración del mes actual (dos renglones)
             doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-            doc.text('Cuota de administración mensual:', M, yCuota);
-            doc.text(`$${Number(t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, yCuota, { align: 'right' });
+            doc.text('Cuota de administración mensual:', M, y);
+            doc.text(`$${Number(t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+            y += 4.5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
             const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
-            doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}: $${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, M, yCuota + 4.5);
+            doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}: $${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, M, y);
 
-            // Si quedó saldo a favor, nota en verde debajo del total
+            // Saldo a favor neto (si total es negativo)
+            const saldoAFavor = total < 0 ? -total : 0;
             if (saldoAFavor > 0) {
+                y += 6;
                 const nombreDest = data.propietario_nombre || data.nombre_propietario || prop.nombre || 'El propietario';
                 doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7.5);
                 doc.setTextColor(16, 185, 129);
-                doc.text(`El propietario ${nombreDest} cuenta con un saldo a favor de $${saldoAFavor.toLocaleString()}`, M, yCuota + 10);
+                doc.text(`El propietario ${nombreDest} cuenta con un saldo a favor de $${saldoAFavor.toLocaleString()}`, M, y);
                 doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
             }
 
             // ── Pie de copia: CONSIGNACIÓN (compacto) ─────────────────────────
-            const yf = Math.max(b + 100, yCuota + (saldoAFavor > 0 ? 16 : 10));
+            const yf = Math.max(b + 100, y + 10);
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.6); doc.line(M, yf, RIGHT, yf);
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
             doc.text('CONSIGNACIÓN PROVISIONAL', W / 2, yf + 4.5, { align: 'center' });
