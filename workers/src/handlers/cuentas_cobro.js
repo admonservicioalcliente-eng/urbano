@@ -102,6 +102,16 @@ export async function handleCreate(request, env, user) {
     [propietario_id]
   );
 
+  // Pagos reales del propietario (para mostrar en el PDF)
+  const pagosRows = await query(env,
+    `SELECT monto, fecha_pago, tipo_pago, comprobante, descripcion
+     FROM pagos WHERE propietario_id = $1
+     ORDER BY fecha_pago ASC`,
+    [propietario_id]
+  );
+  let totalPagos = 0;
+  for (const pg of pagosRows) totalPagos += parseFloat(pg.monto) || 0;
+
   // Cuotas extras pendientes del propietario o de la urbanización (no aplicadas)
   const extras = await query(env,
     `SELECT * FROM cuotas_extras
@@ -211,6 +221,14 @@ export async function handleCreate(request, env, user) {
       monto: abonoAplicado,
       fecha: prop.created_at ? new Date(prop.created_at).toISOString().slice(0, 10) : null
     }] : [],
+    pagos_aplicados: pagosRows.map(pg => ({
+      monto: parseFloat(pg.monto) || 0,
+      fecha_pago: pg.fecha_pago,
+      tipo_pago: pg.tipo_pago,
+      comprobante: pg.comprobante,
+      descripcion: pg.descripcion
+    })),
+    total_pagos: Math.round(totalPagos * 100) / 100,
     totales: {
       cuota_admon: Math.round(totalCuota * 100) / 100,
       saldo_anterior: Math.round(totalSaldoAnt * 100) / 100,

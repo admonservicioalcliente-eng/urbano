@@ -212,54 +212,99 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Histórico: solo meses cerrados (pagados)
+            // Histórico: meses CERRADOS (pagados) con lo que se pagó
+            const mesesCerrados = [];
             (detalle?.periodos_pendientes || []).forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
                 const anio = p.anio || new Date().getFullYear();
-                if (p.cerrado && Number(p.pagado || 0) > 0) {
-                    rows.push({ label: `Cuota de Administración - ${mesLabel} ${anio}`, value: Number(p.pagado), bold: false });
+                const esMesActual = parseInt(p.mes) === new Date().getMonth() + 1 && parseInt(p.anio) === new Date().getFullYear();
+                if (p.cerrado && !esMesActual && Number(p.pagado || 0) > 0) {
+                    mesesCerrados.push({ label: `Cuota de Administración - ${mesLabel} ${anio}`, value: Number(p.pagado) });
                 }
             });
 
-            // Cuotas extras
-            (detalle?.cuotas_extras || []).forEach(e => {
-                rows.push({ label: `Cuota extra: ${e.descripcion || ''}`, value: Number(e.monto || 0), bold: false });
-            });
-
-            // Intereses
-            if (Number(t.intereses || 0) > 0) {
-                rows.push({ label: 'Intereses causados', value: Number(t.intereses), bold: false });
-            }
-
-            rows.forEach(r => {
+            mesesCerrados.forEach(r => {
                 if (y > b + 80) return;
-                doc.setFont('helvetica', r.bold ? 'bold' : 'normal');
+                doc.setFont('helvetica', 'normal');
                 doc.text(r.label, M, y);
                 doc.text(`$${Math.abs(r.value).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4.3;
             });
 
-            // Saldo a favor / abonos aplicados
-            const totalAbonos = Number(t.saldo_favor || 0) + Number(t.abono_inicial || 0);
-            if (totalAbonos > 0) {
+            // Cuotas extras
+            (detalle?.cuotas_extras || []).forEach(e => {
+                if (y > b + 80) return;
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Cuota extra: ${e.descripcion || ''}`, M, y);
+                doc.text(`$${Number(e.monto || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4.3;
+            });
+
+            // Intereses
+            if (Number(t.intereses || 0) > 0) {
+                doc.setFont('helvetica', 'normal');
+                doc.text('Intereses causados', M, y);
+                doc.text(`$${Number(t.intereses).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4.3;
+            }
+
+            // Pagos aplicados (abonos reales del propietario)
+            const pagosAplicados = detalle?.pagos_aplicados || [];
+            if (pagosAplicados.length > 0) {
                 doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
                 doc.line(M, y, RIGHT, y);
                 y += 3;
-                doc.setFont('helvetica', 'normal');
+                pagosAplicados.forEach(pg => {
+                    if (y > b + 80) return;
+                    const fechaPg = pg.fecha_pago ? new Date(pg.fecha_pago).toLocaleDateString() : '';
+                    const comprobante = pg.comprobante || '';
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+                    doc.text(`Pago ${comprobante} (${fechaPg})`, M, y);
+                    doc.text(`-$${Number(pg.monto || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                    y += 4.3;
+                });
+            }
+
+            // Saldo a favor / abonos iniciales
+            const totalAbonos = Number(t.saldo_favor || 0) + Number(t.abono_inicial || 0);
+            if (totalAbonos > 0) {
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
                 doc.text('Saldo a favor / abonos aplicados', M, y);
                 doc.text(`-$${totalAbonos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4.3;
             }
 
-            // TOTAL A PAGAR
-            doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
-            doc.line(RIGHT - 12, y, RIGHT, y);
-            y += 2;
-            const totalAMostrar = total <= 0 ? 0 : total;
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-            doc.text('TOTAL A PAGAR:', M, y + 3);
-            doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
-            y += 6;
+            // TOTAL PAGADO (suma de meses cerrados + pagos aplicados)
+            const totalPagosAplicados = Number(t.total_pagos || 0);
+            if (totalPagosAplicados > 0 || mesesCerrados.length > 0) {
+                doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
+                doc.line(RIGHT - 12, y, RIGHT, y);
+                y += 2;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+                doc.text('TOTAL PAGADO:', M, y + 3);
+                doc.text(`$${totalPagosAplicados.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+                y += 6;
+
+                // Saldo a pagar = 0 (ya se pagó)
+                doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
+                doc.line(M, y, RIGHT, y);
+                y += 5;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 150, 150);
+                doc.text('SALDO A PAGAR:', M, y);
+                doc.text('$0', RIGHT - 12, y, { align: 'right' });
+                doc.setTextColor(0, 0, 0);
+                y += 6;
+            } else {
+                // No hay pagos: mostrar TOTAL A PAGAR normal
+                doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
+                doc.line(RIGHT - 12, y, RIGHT, y);
+                y += 2;
+                const totalAMostrar = total <= 0 ? 0 : total;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+                doc.text('TOTAL A PAGAR:', M, y + 3);
+                doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+                y += 6;
+            }
 
             // Cuota de administración del mes actual (dos renglones)
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
@@ -272,17 +317,6 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
             const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
             doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}: $${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, M, y);
-
-            // Saldo a favor neto (si total es negativo)
-            const saldoAFavor = total < 0 ? -total : 0;
-            if (saldoAFavor > 0) {
-                y += 6;
-                const nombreDest = data.propietario_nombre || data.nombre_propietario || prop.nombre || 'El propietario';
-                doc.setFont('helvetica', 'bolditalic'); doc.setFontSize(7.5);
-                doc.setTextColor(16, 185, 129);
-                doc.text(`El propietario ${nombreDest} cuenta con un saldo a favor de $${saldoAFavor.toLocaleString()}`, M, y);
-                doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
-            }
 
             // ── Pie de copia: CONSIGNACIÓN (compacto) ─────────────────────────
             const yf = Math.max(b + 100, y + 10);
