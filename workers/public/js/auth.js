@@ -11,6 +11,9 @@ window.NassauAuth = {
         }
     },
     async renderLoginPage() {
+        localStorage.removeItem('nassau_token');
+        localStorage.removeItem('nassau_urb_id');
+        localStorage.removeItem('nassau_urb_nombre');
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-shell').style.display = 'none';
         const select = document.getElementById('login-urb');
@@ -65,9 +68,9 @@ window.NassauAuth = {
         if (!token) return false;
         try {
             const payload = this.getUser();
-            if (payload.exp * 1000 < Date.now()) { this.logout(); return false; }
+            if (!payload || !payload.exp || payload.exp * 1000 < Date.now()) { this.logout(); return false; }
             return true;
-        } catch (e) { return false; }
+        } catch (e) { this.logout(); return false; }
     },
     getUser() {
         const token = localStorage.getItem('nassau_token');
