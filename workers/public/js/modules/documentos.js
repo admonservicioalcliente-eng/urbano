@@ -290,11 +290,11 @@ window.NassauDocumentos = {
             const totalAMostrarPagado = totalPagadoMeses || totalPagosAplicados;
             if (totalAMostrarPagado > 0) {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
-                doc.line(RIGHT - 12, y, RIGHT, y);
-                y += 2;
+                doc.line(M, y, RIGHT, y);
+                y += 4;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-                doc.text('TOTAL PAGADO:', M, y + 3);
-                doc.text(`$${totalAMostrarPagado.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+                doc.text('TOTAL PAGADO:', M, y);
+                doc.text(`$${totalAMostrarPagado.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 6;
 
                 // Saldo a pagar = 0 (ya se pagó)
@@ -309,12 +309,12 @@ window.NassauDocumentos = {
             } else {
                 // No hay pagos: mostrar TOTAL A PAGAR normal
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
-                doc.line(RIGHT - 12, y, RIGHT, y);
-                y += 2;
+                doc.line(M, y, RIGHT, y);
+                y += 4;
                 const totalDeuda = total <= 0 ? 0 : total;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-                doc.text('TOTAL A PAGAR:', M, y + 3);
-                doc.text(`$${totalDeuda.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+                doc.text('TOTAL A PAGAR:', M, y);
+                doc.text(`$${totalDeuda.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 6;
             }
 
@@ -322,10 +322,10 @@ window.NassauDocumentos = {
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
             doc.line(M, y, RIGHT, y);
             y += 5;
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-            doc.text('Cuota de administración mensual:', M, y);
-            y += 4.5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+            doc.text('Cuota de administración mensual:', M, y);
+            y += 5;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
             const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
             doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}: $${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, M, y);
 
