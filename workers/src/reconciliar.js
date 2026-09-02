@@ -94,7 +94,30 @@ export async function reconciliarPagos(env, propietarioId) {
     );
   }
 
-  // 4. Estado del propietario: si ya no debe nada (cero o saldo a favor) pasa a
+  // 4. Recalcular saldo_anterior de cada mes: la deuda real de meses anteriores
+  //    que aún no ha sido cubierta por pagos.
+  const todosEstados = await query(env,
+    `SELECT id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, cerrado
+     FROM estados_cuenta WHERE propietario_id = $1 ORDER BY anio ASC, mes ASC`,
+    [propietarioId]
+  );
+  let deudaAcumulada = 0;
+  for (const ec of todosEstados) {
+    const base = parseFloat(ec.pago_actual) + parseFloat(ec.intereses);
+    const favor = parseFloat(ec.saldo_favor) || 0;
+    const deudaMes = Math.max(0, base - favor);
+    const nuevoSaldoAnterior = deudaAcumulada;
+    // Solo actualizar si cambió
+    if (Math.abs(nuevoSaldoAnterior - parseFloat(ec.saldo_anterior)) > 0.01) {
+      await query(env,
+        `UPDATE estados_cuenta SET saldo_anterior = $1 WHERE id = $2`,
+        [nuevoSaldoAnterior, ec.id]
+      );
+    }
+    deudaAcumulada += deudaMes;
+  }
+
+  // 5. Estado del propietario: si ya no debe nada (cero o saldo a favor) pasa a
   //    ACTIVO. Nunca se altera un propietario 'inactivo'.
   const deudaRows = await query(env,
     `SELECT COALESCE(SUM(total_deuda), 0) AS deuda
