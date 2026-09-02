@@ -61,6 +61,8 @@ export async function reconciliarPagos(env, propietarioId) {
   }
 
   // 2. Distribución FIFO del total pagado sobre los estados en orden de fecha.
+  //    saldo_favor almacena: en meses cerrados = monto_aplicado_al_mes,
+  //    en meses abiertos = excedente (crédito) que se arrastra.
   const estados = await query(env,
     `SELECT * FROM estados_cuenta WHERE propietario_id = $1 ORDER BY anio ASC, mes ASC`,
     [propietarioId]
@@ -77,22 +79,25 @@ export async function reconciliarPagos(env, propietarioId) {
     const base = parseFloat(ec.pago_actual) + parseFloat(ec.saldo_anterior) + parseFloat(ec.intereses);
     const disponible = Math.max(0, totalPagado - aplicado);
     const aplicadoMes = Math.min(base, disponible);
-    // saldo_favor solo se registra si hay EXCEDENTE (pago > deuda del mes)
-    const excedenteMes = Math.max(0, aplicadoMes - base);
+    const excedenteMes = Math.max(0, disponible - base);
+    const cerrado = aplicadoMes >= base;
+    // En meses cerrados: saldo_favor = monto aplicado (para que el PDF pueda mostrarlo)
+    // En meses abiertos: saldo_favor = excedente (crédito a favor)
+    const saldoFavor = cerrado ? aplicadoMes : excedenteMes;
     await query(env,
       `UPDATE estados_cuenta SET saldo_favor = $1, cerrado = $2 WHERE id = $3`,
-      [excedenteMes, aplicadoMes >= base, ec.id]
+      [saldoFavor, cerrado, ec.id]
     );
     aplicado += aplicadoMes;
   }
 
   // 3. Excedente de pago por encima de toda la deuda → saldo a favor del último
-  //    estado (crédito), para que siga apareciendo en el estado de cuenta.
+  //    estado abierto (crédito), para que siga apareciendo en el estado de cuenta.
   if (aplicado < totalPagado && estados.length) {
-    const last = estados[estados.length - 1];
+    const lastAbierto = [...estados].reverse().find(e => !e.cerrado) || estados[estados.length - 1];
     await query(env,
       `UPDATE estados_cuenta SET saldo_favor = saldo_favor + $1 WHERE id = $2`,
-      [totalPagado - aplicado, last.id]
+      [totalPagado - aplicado, lastAbierto.id]
     );
   }
 

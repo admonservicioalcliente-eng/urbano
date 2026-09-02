@@ -161,7 +161,10 @@ export async function handleCreate(request, env, user) {
     totalCuota     += pagoActual;
     totalInteres   += intereses;
     totalSaldoAnt  += saldoAnt;
-    totalSaldoFavor += saldoFavor;
+    // Solo sumar saldo_favor de meses ABIERTOS (excedente real)
+    if (!cerrado) {
+      totalSaldoFavor += saldoFavor;
+    }
 
     if (cerrado) {
       // Mes cerrado = pagado, no genera deuda
@@ -195,6 +198,9 @@ export async function handleCreate(request, env, user) {
     periodos_pendientes: ecs.map(e => {
       const base = parseFloat(e.pago_actual) + parseFloat(e.saldo_anterior) + parseFloat(e.intereses);
       const favor = parseFloat(e.saldo_favor) || 0;
+      // En meses cerrados: saldo_favor = monto_aplicado (guardado por reconciliación)
+      // En meses abiertos: saldo_favor = excedente (crédito)
+      const montoAplicado = e.cerrado ? favor : 0;
       const pagado = e.cerrado ? base : 0;
       const pendiente = e.cerrado ? 0 : Math.max(0, base - favor);
       return {
@@ -206,6 +212,7 @@ export async function handleCreate(request, env, user) {
         saldo_favor: e.saldo_favor,
         dias_mora: e.dias_mora,
         cerrado: e.cerrado,
+        monto_aplicado: montoAplicado,
         pagado: pagado,
         pendiente: pendiente,
         total_periodo: pendiente

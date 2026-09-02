@@ -218,8 +218,11 @@ window.NassauDocumentos = {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
                 const anio = p.anio || new Date().getFullYear();
                 const esMesActual = parseInt(p.mes) === new Date().getMonth() + 1 && parseInt(p.anio) === new Date().getFullYear();
-                if (p.cerrado && !esMesActual && Number(p.pagado || 0) > 0) {
-                    mesesCerrados.push({ label: `Cuota de Administración - ${mesLabel} ${anio}`, value: Number(p.pagado) });
+                if (p.cerrado && !esMesActual) {
+                    const montoAplicado = Number(p.monto_aplicado || p.pagado || 0);
+                    if (montoAplicado > 0) {
+                        mesesCerrados.push({ label: `Cuota de Administración - ${mesLabel} ${anio}`, value: montoAplicado });
+                    }
                 }
             });
 
@@ -265,24 +268,33 @@ window.NassauDocumentos = {
                 });
             }
 
-            // Saldo a favor / abonos iniciales
-            const totalAbonos = Number(t.saldo_favor || 0) + Number(t.abono_inicial || 0);
-            if (totalAbonos > 0) {
+            // Saldo a favor: solo de meses ABIERTOS (excedente real, no monto aplicado)
+            let saldoFavorAbiertos = 0;
+            (detalle?.periodos_pendientes || []).forEach(p => {
+                if (!p.cerrado) {
+                    saldoFavorAbiertos += Number(p.saldo_favor || 0);
+                }
+            });
+            saldoFavorAbiertos += Number(t.abono_inicial || 0);
+            if (saldoFavorAbiertos > 0) {
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
                 doc.text('Saldo a favor / abonos aplicados', M, y);
-                doc.text(`-$${totalAbonos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                doc.text(`-$${saldoFavorAbiertos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4.3;
             }
 
-            // TOTAL PAGADO (suma de meses cerrados + pagos aplicados)
+            // TOTAL PAGADO (suma de monto_aplicado de meses cerrados)
+            let totalPagadoMeses = 0;
+            mesesCerrados.forEach(r => { totalPagadoMeses += r.value; });
             const totalPagosAplicados = Number(t.total_pagos || 0);
-            if (totalPagosAplicados > 0 || mesesCerrados.length > 0) {
+            const totalAMostrarPagado = totalPagadoMeses || totalPagosAplicados;
+            if (totalAMostrarPagado > 0) {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
                 doc.line(RIGHT - 12, y, RIGHT, y);
                 y += 2;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text('TOTAL PAGADO:', M, y + 3);
-                doc.text(`$${totalPagosAplicados.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+                doc.text(`$${totalAMostrarPagado.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
                 y += 6;
 
                 // Saldo a pagar = 0 (ya se pagó)
@@ -299,10 +311,10 @@ window.NassauDocumentos = {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
                 doc.line(RIGHT - 12, y, RIGHT, y);
                 y += 2;
-                const totalAMostrar = total <= 0 ? 0 : total;
+                const totalDeuda = total <= 0 ? 0 : total;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text('TOTAL A PAGAR:', M, y + 3);
-                doc.text(`$${totalAMostrar.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
+                doc.text(`$${totalDeuda.toLocaleString()}`, RIGHT - 12, y + 3, { align: 'right' });
                 y += 6;
             }
 
