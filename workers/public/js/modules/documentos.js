@@ -212,16 +212,16 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Cuotas de administración de los meses pendientes
+            // Histórico: solo meses cerrados (pagados)
             (detalle?.periodos_pendientes || []).forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
                 const anio = p.anio || new Date().getFullYear();
-                if (!p.cerrado && Number(p.pendiente || 0) > 0) {
-                    rows.push({ label: `Cuota Administración ${mesLabel} ${anio}`, value: Number(p.pendiente), bold: false });
+                if (p.cerrado && Number(p.pagado || 0) > 0) {
+                    rows.push({ label: `Cuota de Administración - ${mesLabel} ${anio}`, value: Number(p.pagado), bold: false });
                 }
             });
 
-            // Cuotas extras pendientes
+            // Cuotas extras
             (detalle?.cuotas_extras || []).forEach(e => {
                 rows.push({ label: `Cuota extra: ${e.descripcion || ''}`, value: Number(e.monto || 0), bold: false });
             });
@@ -240,22 +240,15 @@ window.NassauDocumentos = {
             });
 
             // Saldo a favor / abonos aplicados
-            if (Number(t.saldo_favor || 0) > 0 || Number(t.abono_inicial || 0) > 0) {
+            const totalAbonos = Number(t.saldo_favor || 0) + Number(t.abono_inicial || 0);
+            if (totalAbonos > 0) {
                 doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
                 doc.line(M, y, RIGHT, y);
                 y += 3;
-                if (Number(t.saldo_favor || 0) > 0) {
-                    doc.setFont('helvetica', 'normal');
-                    doc.text('Saldo a favor / abonos aplicados', M, y);
-                    doc.text(`-$${Number(t.saldo_favor).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                    y += 4.3;
-                }
-                if (Number(t.abono_inicial || 0) > 0) {
-                    doc.setFont('helvetica', 'normal');
-                    doc.text('Abono inicial', M, y);
-                    doc.text(`-$${Number(t.abono_inicial).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                    y += 4.3;
-                }
+                doc.setFont('helvetica', 'normal');
+                doc.text('Saldo a favor / abonos aplicados', M, y);
+                doc.text(`-$${totalAbonos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4.3;
             }
 
             // TOTAL A PAGAR
