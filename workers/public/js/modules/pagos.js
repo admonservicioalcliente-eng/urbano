@@ -102,8 +102,10 @@ window.NassauPagos = {
         };
         try {
             window.NassauApp.showLoading(true);
-            await window.NassauAPI.apiPost('/pagos', data);
+            const nuevoPago = await window.NassauAPI.apiPost('/pagos', data);
             window.NassauApp.showToast('Pago registrado', 'success');
+            const prop = this.propietariosList.find(p => p.id == propietarioId);
+            if (window.NassauDocumentos && prop) window.NassauDocumentos.generarReciboPago(nuevoPago, prop);
             window.NassauApp.closeModal();
             this.loadPagos(propietarioId);
         } catch(err) { window.NassauApp.showToast('Error: ' + err.message, 'error'); } 

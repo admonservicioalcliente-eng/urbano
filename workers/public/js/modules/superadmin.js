@@ -73,6 +73,7 @@ window.NassauSuperAdmin = {
                     <td>${u.email || '-'}</td>
                     <td><span class="badge badge-${u.estado === 'admitida' ? 'activo' : (u.estado === 'rechazada' ? 'moroso' : 'inactivo')}">${u.estado.toUpperCase()}</span></td>
                     <td>
+                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.showEditUrbModal('${u.id}', '${encodeURIComponent(JSON.stringify({nombre: u.nombre, direccion: u.direccion || '', email: u.email || ''}))}')">Editar</button>
                         <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'admitida')">Admitir</button>
                         <button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'rechazada')">Rechazar</button>
                     </td>
@@ -243,6 +244,63 @@ window.NassauSuperAdmin = {
             window.NassauApp.showLoading(true);
             await window.NassauAPI.apiPost('/urbanizaciones', data);
             window.NassauApp.showToast('Urbanización creada (pendiente de aprobación)', 'success');
+            window.NassauApp.closeModal();
+            this.loadUrbanizaciones();
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    showEditUrbModal(id, encodedData) {
+        const data = JSON.parse(decodeURIComponent(encodedData));
+        const html = `
+            <form onsubmit="window.NassauSuperAdmin.updateUrb(event, '${id}')">
+                <div class="form-group"><label>Nombre</label><input type="text" id="sa-edit-nombre" value="${data.nombre}" required></div>
+                <div class="form-group"><label>Dirección</label><input type="text" id="sa-edit-dir" value="${data.direccion}"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="sa-edit-email" value="${data.email}"></div>
+                <div class="form-group">
+                    <label>Logo del edificio (mín. 200x200 px, JPG/PNG, máx. 700 KB)</label>
+                    <div id="sa-edit-logo-preview" style="margin:8px 0;"></div>
+                    <input type="file" id="sa-edit-logo" accept="image/jpeg,image/png" class="search-input" onchange="window.NassauSuperAdmin.previewLogo(this, 'sa-edit-logo-preview')">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar</button>
+                </div>
+            </form>`;
+        window.NassauApp.showModal('Editar Urbanización', html);
+        fetch(`https://nassau-api.policomputo.workers.dev/api/urbanizaciones/${id}/logo`)
+            .then(r => r.json()).then(d => {
+                if (d.logo) document.getElementById('sa-edit-logo-preview').innerHTML = `<img src="${d.logo}" style="max-height:80px;border-radius:8px;">`;
+            }).catch(() => {});
+    },
+    previewLogo(input, previewId) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById(previewId).innerHTML = `<img src="${e.target.result}" style="max-height:80px;border-radius:8px;">`;
+        };
+        reader.readAsDataURL(file);
+    },
+    async updateUrb(e, id) {
+        e.preventDefault();
+        try {
+            window.NassauApp.showLoading(true);
+            const fileInput = document.getElementById('sa-edit-logo');
+            if (fileInput.files[0]) {
+                const file = fileInput.files[0];
+                if (file.size > 700 * 1024) {
+                    window.NassauApp.showToast('El logo no debe exceder 700 KB', 'error');
+                    return;
+                }
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                await window.NassauAPI.apiPut(`/urbanizaciones/${id}/logo`, { logo_base64: base64 });
+            }
+            window.NassauApp.showToast('Urbanización actualizada', 'success');
             window.NassauApp.closeModal();
             this.loadUrbanizaciones();
         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }

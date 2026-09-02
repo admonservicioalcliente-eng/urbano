@@ -8,6 +8,7 @@ import * as cuentasCobroHandler from './handlers/cuentas_cobro.js';
 import * as parametrosHandler from './handlers/parametros.js';
 import * as superadminHandler from './handlers/superadmin.js';
 import * as usuariosHandler from './handlers/usuarios.js';
+import * as paypalHandler from './handlers/paypal.js';
 
 const corsHeaders = (env) => ({
   'Access-Control-Allow-Origin': env.FRONTEND_URL || '*',
@@ -47,6 +48,19 @@ export default {
       // Public: registro de nueva urbanización + admin (queda pendiente de aprobación)
       if (path === '/api/registro-urbanizacion' && method === 'POST') {
         return superadminHandler.handleRegistroUrbanizacion(request, env);
+      }
+
+      // Public: PayPal routes
+      if (path === '/api/paypal/create-order' && method === 'POST') {
+        const res = await paypalHandler.handleCreateOrder(request, env);
+        Object.entries(corsHeaders(env)).forEach(([k, v]) => res.headers.set(k, v));
+        return res;
+      }
+      if (path === '/api/paypal/capture' && method === 'GET') {
+        return paypalHandler.handleCapture(request, env);
+      }
+      if (path === '/api/paypal/cancel' && method === 'GET') {
+        return paypalHandler.handleCancel(request, env);
       }
 
       // Public: urbanizaciones for login page (only when NOT authenticated)
@@ -133,6 +147,10 @@ export default {
         else if (method === 'DELETE' && resourceId) res = await usuariosHandler.handleDelete(request, env, user, resourceId);
       } else if (path === '/api/admin/stats' && method === 'GET') {
         res = await superadminHandler.handleGetStats(request, env, user);
+      } else if (path === '/api/paypal/renew' && method === 'POST') {
+        res = await paypalHandler.handleRenew(request, env);
+      } else if (path.match(/^\/api\/paypal\/status\/[^/]+$/) && method === 'GET') {
+        res = await paypalHandler.handleStatus(request, env, user, resourceId);
       } else if (!path.startsWith('/api/')) {
         // Serve static assets for non-API routes (force no-cache so HTML updates instantly)
         const assetRes = await env.ASSETS.fetch(request);

@@ -4,6 +4,7 @@ window.NassauAuth = {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-shell').style.display = 'flex';
             this.updateUserInfo();
+            window.NassauApp?.loadSidebarLogo();
             window.NassauApp?.showPage('dashboard');
         } else {
             this.renderLoginPage();
@@ -48,6 +49,9 @@ window.NassauAuth = {
             if (data.user?.urbanizacion_nombre) localStorage.setItem('nassau_urb_nombre', data.user.urbanizacion_nombre);
             this.initAuth();
             window.NassauApp?.showToast('Login exitoso', 'success');
+            if (data.preaviso) {
+                setTimeout(() => window.NassauApp?.showToast(data.preaviso, 'info'), 1500);
+            }
         } catch (error) { window.NassauApp?.showToast(error.message, 'error'); } 
         finally { window.NassauApp?.showLoading(false); }
     },
@@ -92,6 +96,22 @@ window.NassauAuth = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Handle PayPal payment result
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    if (paymentStatus === 'success') {
+        setTimeout(() => window.NassauApp?.showToast('Pago exitoso. Ya puede iniciar sesión.', 'success'), 500);
+        window.history.replaceState({}, '', window.location.pathname);
+    } else if (paymentStatus === 'failed') {
+        setTimeout(() => window.NassauApp?.showToast('El pago no se completó. Intente nuevamente.', 'error'), 500);
+        window.history.replaceState({}, '', window.location.pathname);
+    } else if (paymentStatus === 'cancelled') {
+        setTimeout(() => window.NassauApp?.showToast('Pago cancelado. Puede intentar más tarde.', 'info'), 500);
+        window.history.replaceState({}, '', window.location.pathname);
+    } else if (paymentStatus === 'error') {
+        setTimeout(() => window.NassauApp?.showToast('Error al procesar el pago.', 'error'), 500);
+        window.history.replaceState({}, '', window.location.pathname);
+    }
     document.getElementById('login-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = document.getElementById('login-email').value;
@@ -123,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         reader.readAsDataURL(logoFile);
                     });
                 }
-                await window.NassauAPI.apiPost('/registro-urbanizacion', {
+                const regData = {
                     nombre: document.getElementById('reg-nombre').value,
                     direccion: document.getElementById('reg-direccion').value,
                     telefono: document.getElementById('reg-telefono').value,
@@ -133,11 +153,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     admin_email: document.getElementById('reg-admin-email').value,
                     admin_password: document.getElementById('reg-admin-password').value,
                     logo_base64
+                };
+                const result = await window.NassauAPI.apiPost('/registro-urbanizacion', regData);
+                window.NassauApp?.showToast('Registro exitoso. Redirigiendo a PayPal...', 'success');
+
+                const payData = await window.NassauAPI.apiPost('/paypal/create-order', {
+                    urb_id: result.urbanizacion.id,
+                    email: regData.admin_email,
+                    nombre: regData.nombre
                 });
-                window.NassauApp?.showToast('Registro solicitado. El SUPERADMIN aprobará su urbanización y podrá iniciar sesión.', 'success');
-                regForm.reset();
-                regForm.style.display = 'none';
-                regToggle.textContent = 'Registrar nueva urbanización';
+                if (payData.approveUrl) {
+                    window.location.href = payData.approveUrl;
+                } else {
+                    window.NassauApp?.showToast('Error al crear el pago. Intente nuevamente.', 'error');
+                }
             } catch (error) {
                 window.NassauApp?.showToast(error.message, 'error');
             } finally {

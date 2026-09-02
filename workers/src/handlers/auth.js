@@ -46,13 +46,29 @@ export async function handleLogin(request, env) {
   }
   const urbanizacionId = user.rol === 'superadmin' ? urb_id : user.urbanizacion_id;
 
-  // Validar que la urbanización esté admitida (las registradas quedan pendientes
-  // de aprobación por el SUPERADMIN)
+  // Validar que la urbanización esté admitida y el plan esté activo
   if (user.rol !== 'superadmin') {
-    const urbRows = await query(env, `SELECT estado FROM urbanizaciones WHERE id = $1`, [urbanizacionId]);
+    const urbRows = await query(env,
+      `SELECT estado, plan_activo, fecha_expiracion FROM urbanizaciones WHERE id = $1`,
+      [urbanizacionId]
+    );
     if (!urbRows.length) return err(403, 'Urbanización no encontrada.');
-    if (urbRows[0].estado !== 'admitida') {
+    const urb = urbRows[0];
+    if (urb.estado !== 'admitida') {
       return err(403, 'Su urbanización está pendiente de aprobación por el SUPERADMIN. Espere a que sea admitida.');
+    }
+    if (!urb.plan_activo) {
+      return err(403, 'Su plan no está activo. Complete el pago para acceder al sistema.');
+    }
+    if (urb.fecha_expiracion && new Date(urb.fecha_expiracion) < new Date()) {
+      return err(403, 'Su plan ha vencido. Renueva para seguir accediendo al sistema.');
+    }
+    // Preaviso 30 días
+    if (urb.fecha_expiracion) {
+      const diasRestantes = Math.ceil((new Date(urb.fecha_expiracion) - new Date()) / (1000 * 60 * 60 * 24));
+      if (diasRestantes <= 30 && diasRestantes > 0) {
+        // Login permitido pero se envía aviso en la respuesta
+      }
     }
   }
 
@@ -72,10 +88,22 @@ export async function handleLogin(request, env) {
   }, env.JWT_SECRET);
 
   // Nombre de la urbanización para mostrar como título de la app
-  const urbNameRows = await query(env, `SELECT nombre FROM urbanizaciones WHERE id = $1`, [urbanizacionId]);
+  const urbNameRows = await query(env,
+    `SELECT nombre, fecha_expiracion FROM urbanizaciones WHERE id = $1`,
+    [urbanizacionId]
+  );
   const urbanizacion_nombre = urbNameRows.length ? urbNameRows[0].nombre : null;
 
-  return ok({ token, user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, urbanizacion_id: urbanizacionId, urbanizacion_nombre } });
+  // Calcular preaviso
+  let preaviso = null;
+  if (urbNameRows.length && urbNameRows[0].fecha_expiracion) {
+    const diasRestantes = Math.ceil((new Date(urbNameRows[0].fecha_expiracion) - new Date()) / (1000 * 60 * 60 * 24));
+    if (diasRestantes <= 30 && diasRestantes > 0) {
+      preaviso = `Su plan vence en ${diasRestantes} días. Renueva para no perder el acceso.`;
+    }
+  }
+
+  return ok({ token, user: { id: user.id, email: user.email, nombre: user.nombre, rol: user.rol, urbanizacion_id: urbanizacionId, urbanizacion_nombre }, preaviso });
 }
 
 /**

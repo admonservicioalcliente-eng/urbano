@@ -31,6 +31,13 @@ export async function ensureMigrations(env) {
     const sql = postgres(connectionString, { max: 1 });
     try {
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS logo_base64 TEXT`);
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT FALSE`);
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS fecha_pago TIMESTAMPTZ`);
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS fecha_expiracion TIMESTAMPTZ`);
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS paypal_order_id VARCHAR(100)`);
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS monto_pago DECIMAL(10,2)`);
+      // Activar urbanizaciones existentes que ya estaban admitidas
+      await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
       migrated = true;
     } finally { await sql.end(); }
   } catch (e) { console.error('Migration error:', e.message); }
