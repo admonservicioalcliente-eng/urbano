@@ -212,21 +212,24 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Histórico: meses CERRADOS (pagados) con lo que se pagó
-            const mesesCerrados = [];
+            // Todas las cuotas de administración (pagadas y pendientes)
+            const todasLasCuotas = [];
             (detalle?.periodos_pendientes || []).forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
                 const anio = p.anio || new Date().getFullYear();
                 const esMesActual = parseInt(p.mes) === new Date().getMonth() + 1 && parseInt(p.anio) === new Date().getFullYear();
-                if (p.cerrado && !esMesActual) {
-                    const montoAplicado = Number(p.monto_aplicado || p.pagado || 0);
-                    if (montoAplicado > 0) {
-                        mesesCerrados.push({ label: `Cuota de Administración - ${mesLabel} ${anio}`, value: montoAplicado });
-                    }
+                const cuotaMes = Number(p.pago_actual || 0);
+                if (cuotaMes > 0 && !esMesActual) {
+                    const estado = p.cerrado ? 'Pagado' : 'Pendiente';
+                    todasLasCuotas.push({ 
+                        label: `Cuota de Administración - ${mesLabel} ${anio}`, 
+                        value: cuotaMes,
+                        estado: estado
+                    });
                 }
             });
 
-            mesesCerrados.forEach(r => {
+            todasLasCuotas.forEach(r => {
                 if (y > b + 80) return;
                 doc.setFont('helvetica', 'normal');
                 doc.text(r.label, M, y);
@@ -283,31 +286,42 @@ window.NassauDocumentos = {
                 y += 4.3;
             }
 
-            // TOTAL PAGADO (suma de monto_aplicado de meses cerrados)
-            let totalPagadoMeses = 0;
-            mesesCerrados.forEach(r => { totalPagadoMeses += r.value; });
-            const totalPagosAplicados = Number(t.total_pagos || 0);
-            const totalAMostrarPagado = totalPagadoMeses || totalPagosAplicados;
-            if (totalAMostrarPagado > 0) {
+            // TOTAL DE CUOTAS (suma de todas las cuotas de administración)
+            let totalCuotas = 0;
+            todasLasCuotas.forEach(r => { totalCuotas += r.value; });
+            
+            if (totalCuotas > 0) {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
                 doc.line(M, y, RIGHT, y);
                 y += 4;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-                doc.text('TOTAL PAGADO:', M, y);
-                doc.text(`$${totalAMostrarPagado.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                doc.text('TOTAL CUOTAS:', M, y);
+                doc.text(`$${totalCuotas.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 6;
 
-                // Saldo a pagar = 0 (ya se pagó)
+                // Pagos aplicados (negativo)
+                const pagosAplicados = detalle?.pagos_aplicados || [];
+                let totalPagos = 0;
+                pagosAplicados.forEach(pg => { totalPagos += Number(pg.monto || 0); });
+                if (totalPagos > 0) {
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+                    doc.text('Pagos aplicados:', M, y);
+                    doc.text(`-$${totalPagos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                    y += 5;
+                }
+
+                // ESTADO DE CUENTA
+                const estadoCuenta = totalCuotas - totalPagos;
                 doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
                 doc.line(M, y, RIGHT, y);
                 y += 5;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 150, 150);
                 doc.text('ESTADO DE CUENTA:', M, y);
-                doc.text('$0', RIGHT - 12, y, { align: 'right' });
+                doc.text(`$${estadoCuenta.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 doc.setTextColor(0, 0, 0);
                 y += 6;
             } else {
-                // No hay pagos: mostrar TOTAL A PAGAR normal
+                // No hay cuotas: mostrar TOTAL A PAGAR normal
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
                 doc.line(M, y, RIGHT, y);
                 y += 4;
