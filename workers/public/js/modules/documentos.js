@@ -254,41 +254,24 @@ window.NassauDocumentos = {
                 y += 4.3;
             }
 
-            // Pagos aplicados (abonos reales del propietario)
-            const pagosAplicados = detalle?.pagos_aplicados || [];
-            if (pagosAplicados.length > 0) {
-                doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
-                doc.line(M, y, RIGHT, y);
-                y += 3;
-                pagosAplicados.forEach(pg => {
-                    if (y > b + 80) return;
-                    const fechaPg = pg.fecha_pago ? new Date(pg.fecha_pago).toLocaleDateString() : '';
-                    const comprobante = pg.comprobante || '';
-                    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-                    doc.text(`Pago ${comprobante} (${fechaPg})`, M, y);
-                    doc.text(`-$${Number(pg.monto || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                    y += 4.3;
-                });
-            }
-
-            // Saldo a favor: solo de meses ABIERTOS (excedente real, no monto aplicado)
-            let saldoFavorAbiertos = 0;
-            (detalle?.periodos_pendientes || []).forEach(p => {
-                if (!p.cerrado) {
-                    saldoFavorAbiertos += Number(p.saldo_favor || 0);
-                }
-            });
-            saldoFavorAbiertos += Number(t.abono_inicial || 0);
-            if (saldoFavorAbiertos > 0) {
-                doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-                doc.text('Saldo a favor / abonos aplicados', M, y);
-                doc.text(`-$${saldoFavorAbiertos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
-            }
-
             // TOTAL DE CUOTAS (suma de todas las cuotas de administración)
             let totalCuotas = 0;
             todasLasCuotas.forEach(r => { totalCuotas += r.value; });
+            
+            // Pagos aplicados (abonos reales del propietario)
+            const pagosAplicados = detalle?.pagos_aplicados || [];
+            let totalPagos = 0;
+            pagosAplicados.forEach(pg => { totalPagos += Number(pg.monto || 0); });
+            
+            // Construir descripción de pagos en una sola línea
+            let pagosDescripcion = '';
+            if (pagosAplicados.length > 0) {
+                const pagosLista = pagosAplicados.map(pg => {
+                    const fechaPg = pg.fecha_pago ? new Date(pg.fecha_pago).toLocaleDateString() : '';
+                    return `${pg.comprobante || ''} ${fechaPg}`;
+                }).join(', ');
+                pagosDescripcion = ` (${pagosLista})`;
+            }
             
             if (totalCuotas > 0) {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
@@ -297,17 +280,33 @@ window.NassauDocumentos = {
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text('TOTAL CUOTAS:', M, y);
                 doc.text(`$${totalCuotas.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 6;
+                y += 5;
 
-                // Pagos aplicados (negativo)
-                const pagosAplicados = detalle?.pagos_aplicados || [];
-                let totalPagos = 0;
-                pagosAplicados.forEach(pg => { totalPagos += Number(pg.monto || 0); });
+                // Pagos aplicados en una o dos líneas
                 if (totalPagos > 0) {
                     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-                    doc.text('Pagos aplicados:', M, y);
-                    doc.text(`-$${totalPagos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                    y += 5;
+                    const textoPagos = `Pagos aplicados${pagosDescripcion}:`;
+                    const anchoDisponible = (RIGHT - 12) - M;
+                    const textoWidth = doc.getTextWidth(textoPagos);
+                    
+                    if (textoWidth > anchoDisponible) {
+                        // Texto largo: separar descripción del valor
+                        doc.text('Pagos aplicados:', M, y);
+                        doc.text(`-$${totalPagos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                        y += 4;
+                        // Detalle de pagos en la siguiente línea
+                        doc.setFontSize(8);
+                        const detallePagos = pagosAplicados.map(pg => {
+                            const fechaPg = pg.fecha_pago ? new Date(pg.fecha_pago).toLocaleDateString() : '';
+                            return `${pg.comprobante || ''} ${fechaPg}`;
+                        }).join(', ');
+                        doc.text(`(${detallePagos})`, M, y);
+                        y += 5;
+                    } else {
+                        doc.text(textoPagos, M, y);
+                        doc.text(`-$${totalPagos.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                        y += 5;
+                    }
                 }
 
                 // ESTADO DE CUENTA
