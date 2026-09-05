@@ -73,7 +73,7 @@ window.NassauSuperAdmin = {
                     <td>${u.email || '-'}</td>
                     <td><span class="badge badge-${u.estado === 'admitida' ? 'activo' : (u.estado === 'rechazada' ? 'moroso' : 'inactivo')}">${u.estado.toUpperCase()}</span></td>
                     <td>
-                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.showEditUrbModal('${u.id}', '${encodeURIComponent(JSON.stringify({nombre: u.nombre, direccion: u.direccion || '', email: u.email || ''}))}')">Editar</button>
+                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.showEditUrbModal('${u.id}', '${encodeURIComponent(JSON.stringify({nombre: u.nombre, direccion: u.direccion || '', email: u.email || '', telefono: u.telefono || '', banco_numero_cuenta: u.banco_numero_cuenta || '', banco_tipo_cuenta: u.banco_tipo_cuenta || 'ahorros', banco_titular: u.banco_titular || '', banco_celular: u.banco_celular || ''}))}')">Editar</button>
                         <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'admitida')">Admitir</button>
                         <button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'rechazada')">Rechazar</button>
                     </td>
@@ -271,6 +271,18 @@ window.NassauSuperAdmin = {
                 <div class="form-group"><label>Nombre</label><input type="text" id="sa-edit-nombre" value="${data.nombre}" required></div>
                 <div class="form-group"><label>Dirección</label><input type="text" id="sa-edit-dir" value="${data.direccion}"></div>
                 <div class="form-group"><label>Email</label><input type="email" id="sa-edit-email" value="${data.email}"></div>
+                <div class="form-group"><label>Teléfono</label><input type="text" id="sa-edit-tel" value="${data.telefono}"></div>
+                <hr style="margin: 10px 0; border-color: #ddd;">
+                <p style="font-weight: bold; margin-bottom: 10px;">Datos Bancarios (para PDF)</p>
+                <div class="form-group"><label>Número de Cuenta</label><input type="text" id="sa-edit-cuenta" value="${data.banco_numero_cuenta}"></div>
+                <div class="form-group"><label>Tipo de Cuenta</label>
+                    <select id="sa-edit-tipo-cuenta">
+                        <option value="ahorros" ${data.banco_tipo_cuenta === 'ahorros' ? 'selected' : ''}>Ahorros</option>
+                        <option value="corriente" ${data.banco_tipo_cuenta === 'corriente' ? 'selected' : ''}>Corriente</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Titular de la Cuenta</label><input type="text" id="sa-edit-titular" value="${data.banco_titular}"></div>
+                <div class="form-group"><label>Celular de Contacto</label><input type="text" id="sa-edit-celular" value="${data.banco_celular}"></div>
                 <div class="form-group">
                     <label>Logo del edificio (mín. 200x200 px, JPG/PNG, máx. 700 KB)</label>
                     <div id="sa-edit-logo-preview" style="margin:8px 0;"></div>
@@ -300,6 +312,21 @@ window.NassauSuperAdmin = {
         e.preventDefault();
         try {
             window.NassauApp.showLoading(true);
+            
+            // Actualizar datos bancarios
+            const data = {
+                nombre: document.getElementById('sa-edit-nombre').value,
+                direccion: document.getElementById('sa-edit-dir').value,
+                email: document.getElementById('sa-edit-email').value,
+                telefono: document.getElementById('sa-edit-tel').value,
+                banco_numero_cuenta: document.getElementById('sa-edit-cuenta').value,
+                banco_tipo_cuenta: document.getElementById('sa-edit-tipo-cuenta').value,
+                banco_titular: document.getElementById('sa-edit-titular').value,
+                banco_celular: document.getElementById('sa-edit-celular').value
+            };
+            await window.NassauAPI.apiPut(`/urbanizaciones/${id}`, data);
+            
+            // Actualizar logo si se seleccionó
             const fileInput = document.getElementById('sa-edit-logo');
             if (fileInput.files[0]) {
                 const file = fileInput.files[0];
@@ -315,6 +342,7 @@ window.NassauSuperAdmin = {
                 });
                 await window.NassauAPI.apiPut(`/urbanizaciones/${id}/logo`, { logo_base64: base64 });
             }
+            
             window.NassauApp.showToast('Urbanización actualizada', 'success');
             window.NassauApp.closeModal();
             this.loadUrbanizaciones();
