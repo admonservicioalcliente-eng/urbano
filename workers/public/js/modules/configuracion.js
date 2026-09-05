@@ -35,18 +35,22 @@ window.NassauConfiguracion = {
                 <tr>
                     <td><strong>${p.anio}</strong></td>
                     <td>
-                        <div class="config-dias-control">
-                            <span style="margin-right:4px;">$</span>
-                            <input type="number" step="1000" min="0" class="config-field config-cuota" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <div class="config-dias-control">
+                                <span style="margin-right:4px;">$</span>
+                                <input type="number" step="1000" min="0" class="config-field config-cuota" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                            </div>
                             <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.modificarCuota('${p.id}')">Modificar</button>
                         </div>
                     </td>
                     <td><span class="badge badge-activo">${p.prefijo_comprobante || 'NAS'}</span></td>
                     <td>
-                        <div class="config-consec-control">
-                            <button class="btn-secondary btn-sm" onclick="window.NassauConfiguracion.ajustarConsecutivo('${p.id}', -1)">−</button>
-                            <input type="number" min="0" class="config-consec-input" id="consec-${p.id}" value="${p.consecutivo_comprobante || 0}">
-                            <button class="btn-secondary btn-sm" onclick="window.NassauConfiguracion.ajustarConsecutivo('${p.id}', 1)">+</button>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <div class="config-consec-control">
+                                <button class="btn-secondary btn-sm" onclick="window.NassauConfiguracion.ajustarConsecutivo('${p.id}', -1)">−</button>
+                                <input type="number" min="0" class="config-consec-input" id="consec-${p.id}" value="${p.consecutivo_comprobante || 0}">
+                                <button class="btn-secondary btn-sm" onclick="window.NassauConfiguracion.ajustarConsecutivo('${p.id}', 1)">+</button>
+                            </div>
                             <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.generarConsecutivo('${p.id}', '${p.prefijo_comprobante || 'NAS'}')">Generar</button>
                         </div>
                     </td>
