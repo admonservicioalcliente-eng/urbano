@@ -30,6 +30,7 @@ CREATE TABLE urbanizaciones (
     prefijo_doc  VARCHAR(10) NOT NULL DEFAULT 'NAS',
     banco_numero_cuenta  VARCHAR(30),
     banco_tipo_cuenta    VARCHAR(20) DEFAULT 'ahorros',
+    banco_nombre         VARCHAR(100),
     banco_titular        VARCHAR(150),
     banco_celular        VARCHAR(20),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),

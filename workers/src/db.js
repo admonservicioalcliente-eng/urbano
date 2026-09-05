@@ -38,6 +38,7 @@ export async function ensureMigrations(env) {
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS monto_pago DECIMAL(10,2)`);
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_numero_cuenta VARCHAR(30)`);
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_tipo_cuenta VARCHAR(20) DEFAULT 'ahorros'`);
+      await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_nombre VARCHAR(100)`);
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_titular VARCHAR(150)`);
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_celular VARCHAR(20)`);
       // Activar urbanizaciones existentes que ya estaban admitidas

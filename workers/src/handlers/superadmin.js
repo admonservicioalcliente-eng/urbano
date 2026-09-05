@@ -50,15 +50,15 @@ export async function handleCreateUrbanizacion(request, env, user) {
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
   const { nombre, direccion, nit, telefono, email, prefijo_doc, 
-          banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular } = body;
+          banco_numero_cuenta, banco_tipo_cuenta, banco_nombre, banco_titular, banco_celular } = body;
   if (!nombre) return err(400, 'El nombre de la urbanización es obligatorio');
 
   const rows = await query(env,
     `INSERT INTO urbanizaciones (nombre, direccion, nit, telefono, email, estado, prefijo_doc,
-                                banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular)
-     VALUES ($1, $2, $3, $4, $5, 'pendiente', $6, $7, $8, $9, $10) RETURNING *`,
+                                banco_numero_cuenta, banco_tipo_cuenta, banco_nombre, banco_titular, banco_celular)
+     VALUES ($1, $2, $3, $4, $5, 'pendiente', $6, $7, $8, $9, $10, $11) RETURNING *`,
     [nombre, direccion, nit, telefono, email, prefijo_doc || 'NAS',
-     banco_numero_cuenta, banco_tipo_cuenta || 'ahorros', banco_titular, banco_celular]
+     banco_numero_cuenta, banco_tipo_cuenta || 'ahorros', banco_nombre, banco_titular, banco_celular]
   );
   return ok(rows[0], 201);
 }
@@ -124,7 +124,7 @@ export async function handleUpdateUrbanizacion(request, env, user, id) {
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
   const { nombre, direccion, nit, telefono, email, prefijo_doc,
-          banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular } = body;
+          banco_numero_cuenta, banco_tipo_cuenta, banco_nombre, banco_titular, banco_celular } = body;
 
   // Construir SET dinámico solo con campos definidos
   const updates = [];
@@ -139,6 +139,7 @@ export async function handleUpdateUrbanizacion(request, env, user, id) {
   if (prefijo_doc !== undefined) { updates.push(`prefijo_doc = $${idx++}`); values.push(prefijo_doc); }
   if (banco_numero_cuenta !== undefined) { updates.push(`banco_numero_cuenta = $${idx++}`); values.push(banco_numero_cuenta); }
   if (banco_tipo_cuenta !== undefined) { updates.push(`banco_tipo_cuenta = $${idx++}`); values.push(banco_tipo_cuenta); }
+  if (banco_nombre !== undefined) { updates.push(`banco_nombre = $${idx++}`); values.push(banco_nombre); }
   if (banco_titular !== undefined) { updates.push(`banco_titular = $${idx++}`); values.push(banco_titular); }
   if (banco_celular !== undefined) { updates.push(`banco_celular = $${idx++}`); values.push(banco_celular); }
 

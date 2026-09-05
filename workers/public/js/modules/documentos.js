@@ -456,8 +456,10 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
             const tipoCuenta = urb.banco_tipo_cuenta || 'ahorros';
             const numCuenta = urb.banco_numero_cuenta || '3002272559';
+            const nombreBanco = urb.banco_nombre || '';
             const titular = urb.banco_titular || 'SONEIDA OSSA QUINTERO';
-            doc.text(`CONSIGNACIÓN: ${tipoCuenta.toUpperCase()} No. ${numCuenta}`, W / 2, yf + 4, { align: 'center' });
+            const textoBanco = nombreBanco ? `${nombreBanco} - ` : '';
+            doc.text(`${textoBanco}CONSIGNACIÓN: ${tipoCuenta.toUpperCase()} No. ${numCuenta}`, W / 2, yf + 4, { align: 'center' });
             doc.setFont('helvetica', 'bold');
             doc.text(titular.toUpperCase(), W / 2, yf + 8, { align: 'center' });
             

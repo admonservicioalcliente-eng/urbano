@@ -73,7 +73,7 @@ window.NassauSuperAdmin = {
                     <td>${u.email || '-'}</td>
                     <td><span class="badge badge-${u.estado === 'admitida' ? 'activo' : (u.estado === 'rechazada' ? 'moroso' : 'inactivo')}">${u.estado.toUpperCase()}</span></td>
                     <td>
-                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.showEditUrbModal('${u.id}', '${encodeURIComponent(JSON.stringify({nombre: u.nombre, direccion: u.direccion || '', email: u.email || '', telefono: u.telefono || '', banco_numero_cuenta: u.banco_numero_cuenta || '', banco_tipo_cuenta: u.banco_tipo_cuenta || 'ahorros', banco_titular: u.banco_titular || '', banco_celular: u.banco_celular || ''}))}')">Editar</button>
+                        <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.showEditUrbModal('${u.id}', '${encodeURIComponent(JSON.stringify({nombre: u.nombre, direccion: u.direccion || '', email: u.email || '', telefono: u.telefono || '', banco_numero_cuenta: u.banco_numero_cuenta || '', banco_tipo_cuenta: u.banco_tipo_cuenta || 'ahorros', banco_nombre: u.banco_nombre || '', banco_titular: u.banco_titular || '', banco_celular: u.banco_celular || ''}))}')">Editar</button>
                         <button class="btn-secondary btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'admitida')">Admitir</button>
                         <button class="btn-danger btn-sm" onclick="window.NassauSuperAdmin.updateEstado('${u.id}', 'rechazada')">Rechazar</button>
                     </td>
@@ -233,6 +233,36 @@ window.NassauSuperAdmin = {
                         <option value="corriente">Corriente</option>
                     </select>
                 </div>
+                <div class="form-group"><label>Banco</label>
+                    <select id="sa-banco">
+                        <option value="">— Seleccionar banco —</option>
+                        <option value="Bancolombia">Bancolombia</option>
+                        <option value="Banco de Bogotá">Banco de Bogotá</option>
+                        <option value="Banco Davivienda">Banco Davivienda</option>
+                        <option value="Banco BBVA">Banco BBVA</option>
+                        <option value="Banco de Occidente">Banco de Occidente</option>
+                        <option value="Banco Popular">Banco Popular</option>
+                        <option value="Banco AV Villas">Banco AV Villas</option>
+                        <option value="Banco Caja Social">Banco Caja Social</option>
+                        <option value="Banco Colpatria">Banco Colpatria</option>
+                        <option value="Banco Itaú">Banco Itaú</option>
+                        <option value="Scotiabank Colpatria">Scotiabank Colpatria</option>
+                        <option value="Banco Falabella">Banco Falabella</option>
+                        <option value="Banco Confiar">Banco Confiar</option>
+                        <option value="Banco Coomeva">Banco Coomeva</option>
+                        <option value="Banco Agrícola">Banco Agrícola</option>
+                        <option value="Banco Crédito">Banco Crédito</option>
+                        <option value="Banco Santander">Banco Santander</option>
+                        <option value="Banco Pichincha">Banco Pichincha</option>
+                        <option value="Banco W">Banco W</option>
+                        <option value="Bancamía">Bancamía</option>
+                        <option value="Lulo Bank">Lulo Bank</option>
+                        <option value="Nequi">Nequi</option>
+                        <option value="Daviplata">Daviplata</option>
+                        <option value="RappiPay">RappiPay</option>
+                        <option value="Nu Colombia">Nu Colombia</option>
+                    </select>
+                </div>
                 <div class="form-group"><label>Titular de la Cuenta</label><input type="text" id="sa-titular"></div>
                 <div class="form-group"><label>Celular de Contacto</label><input type="text" id="sa-celular"></div>
                 <div class="form-actions">
@@ -252,6 +282,7 @@ window.NassauSuperAdmin = {
             prefijo_doc: document.getElementById('sa-prefijo').value.trim().toUpperCase() || 'NAS',
             banco_numero_cuenta: document.getElementById('sa-cuenta').value,
             banco_tipo_cuenta: document.getElementById('sa-tipo-cuenta').value,
+            banco_nombre: document.getElementById('sa-banco').value,
             banco_titular: document.getElementById('sa-titular').value,
             banco_celular: document.getElementById('sa-celular').value
         };
@@ -279,6 +310,36 @@ window.NassauSuperAdmin = {
                     <select id="sa-edit-tipo-cuenta">
                         <option value="ahorros" ${data.banco_tipo_cuenta === 'ahorros' ? 'selected' : ''}>Ahorros</option>
                         <option value="corriente" ${data.banco_tipo_cuenta === 'corriente' ? 'selected' : ''}>Corriente</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Banco</label>
+                    <select id="sa-edit-banco">
+                        <option value="">— Seleccionar banco —</option>
+                        <option value="Bancolombia" ${data.banco_nombre === 'Bancolombia' ? 'selected' : ''}>Bancolombia</option>
+                        <option value="Banco de Bogotá" ${data.banco_nombre === 'Banco de Bogotá' ? 'selected' : ''}>Banco de Bogotá</option>
+                        <option value="Banco Davivienda" ${data.banco_nombre === 'Banco Davivienda' ? 'selected' : ''}>Banco Davivienda</option>
+                        <option value="Banco BBVA" ${data.banco_nombre === 'Banco BBVA' ? 'selected' : ''}>Banco BBVA</option>
+                        <option value="Banco de Occidente" ${data.banco_nombre === 'Banco de Occidente' ? 'selected' : ''}>Banco de Occidente</option>
+                        <option value="Banco Popular" ${data.banco_nombre === 'Banco Popular' ? 'selected' : ''}>Banco Popular</option>
+                        <option value="Banco AV Villas" ${data.banco_nombre === 'Banco AV Villas' ? 'selected' : ''}>Banco AV Villas</option>
+                        <option value="Banco Caja Social" ${data.banco_nombre === 'Banco Caja Social' ? 'selected' : ''}>Banco Caja Social</option>
+                        <option value="Banco Colpatria" ${data.banco_nombre === 'Banco Colpatria' ? 'selected' : ''}>Banco Colpatria</option>
+                        <option value="Banco Itaú" ${data.banco_nombre === 'Banco Itaú' ? 'selected' : ''}>Banco Itaú</option>
+                        <option value="Scotiabank Colpatria" ${data.banco_nombre === 'Scotiabank Colpatria' ? 'selected' : ''}>Scotiabank Colpatria</option>
+                        <option value="Banco Falabella" ${data.banco_nombre === 'Banco Falabella' ? 'selected' : ''}>Banco Falabella</option>
+                        <option value="Banco Confiar" ${data.banco_nombre === 'Banco Confiar' ? 'selected' : ''}>Banco Confiar</option>
+                        <option value="Banco Coomeva" ${data.banco_nombre === 'Banco Coomeva' ? 'selected' : ''}>Banco Coomeva</option>
+                        <option value="Banco Agrícola" ${data.banco_nombre === 'Banco Agrícola' ? 'selected' : ''}>Banco Agrícola</option>
+                        <option value="Banco Crédito" ${data.banco_nombre === 'Banco Crédito' ? 'selected' : ''}>Banco Crédito</option>
+                        <option value="Banco Santander" ${data.banco_nombre === 'Banco Santander' ? 'selected' : ''}>Banco Santander</option>
+                        <option value="Banco Pichincha" ${data.banco_nombre === 'Banco Pichincha' ? 'selected' : ''}>Banco Pichincha</option>
+                        <option value="Banco W" ${data.banco_nombre === 'Banco W' ? 'selected' : ''}>Banco W</option>
+                        <option value="Bancamía" ${data.banco_nombre === 'Bancamía' ? 'selected' : ''}>Bancamía</option>
+                        <option value="Lulo Bank" ${data.banco_nombre === 'Lulo Bank' ? 'selected' : ''}>Lulo Bank</option>
+                        <option value="Nequi" ${data.banco_nombre === 'Nequi' ? 'selected' : ''}>Nequi</option>
+                        <option value="Daviplata" ${data.banco_nombre === 'Daviplata' ? 'selected' : ''}>Daviplata</option>
+                        <option value="RappiPay" ${data.banco_nombre === 'RappiPay' ? 'selected' : ''}>RappiPay</option>
+                        <option value="Nu Colombia" ${data.banco_nombre === 'Nu Colombia' ? 'selected' : ''}>Nu Colombia</option>
                     </select>
                 </div>
                 <div class="form-group"><label>Titular de la Cuenta</label><input type="text" id="sa-edit-titular" value="${data.banco_titular}"></div>
@@ -321,6 +382,7 @@ window.NassauSuperAdmin = {
                 telefono: document.getElementById('sa-edit-tel').value,
                 banco_numero_cuenta: document.getElementById('sa-edit-cuenta').value,
                 banco_tipo_cuenta: document.getElementById('sa-edit-tipo-cuenta').value,
+                banco_nombre: document.getElementById('sa-edit-banco').value,
                 banco_titular: document.getElementById('sa-edit-titular').value,
                 banco_celular: document.getElementById('sa-edit-celular').value
             };
