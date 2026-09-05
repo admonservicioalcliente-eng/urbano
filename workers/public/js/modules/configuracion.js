@@ -34,7 +34,13 @@ window.NassauConfiguracion = {
                 return `
                 <tr>
                     <td><strong>${p.anio}</strong></td>
-                    <td>$${Number(p.cuota_admon || 0).toLocaleString()}</td>
+                    <td>
+                        <div class="config-dias-control">
+                            <span style="margin-right:4px;">$</span>
+                            <input type="number" step="1000" min="0" class="config-field config-cuota" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                            <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.modificarCuota('${p.id}')">Modificar</button>
+                        </div>
+                    </td>
                     <td><span class="badge badge-activo">${p.prefijo_comprobante || 'NAS'}</span></td>
                     <td>
                         <div class="config-consec-control">
@@ -186,6 +192,23 @@ window.NassauConfiguracion = {
             window.NassauApp.showLoading(true);
             await window.NassauAPI.apiPut(`/parametros/${id}`, { mostrar_copia: checked });
             window.NassauApp.showToast(checked ? 'COPIA activada en PDF' : 'COPIA desactivada en PDF', 'success');
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    async modificarCuota(id) {
+        const input = document.getElementById(`cuota-${id}`);
+        if (!input) return;
+        const nuevaCuota = parseFloat(input.value);
+        if (isNaN(nuevaCuota) || nuevaCuota < 0) {
+            window.NassauApp.showToast('Ingrese un valor válido', 'error');
+            return;
+        }
+        if (!confirm(`¿Modificar cuota a $${nuevaCuota.toLocaleString()}?\n\nSi el valor es mayor al anterior, se generará un cobro retroactivo (Ley 675) por la diferencia en los meses ya cerrados.`)) return;
+        try {
+            window.NassauApp.showLoading(true);
+            const result = await window.NassauAPI.apiPut(`/parametros/${id}`, { cuota_admon: nuevaCuota });
+            window.NassauApp.showToast('Cuota modificada exitosamente', 'success');
+            this.loadConfig();
         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
         finally { window.NassauApp.showLoading(false); }
     }

@@ -50,6 +50,7 @@ CREATE TABLE parametros_anio (
     dia_inicio_mora          INTEGER NOT NULL DEFAULT 6,
     cuota_admon              DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     mostrar_copia            BOOLEAN NOT NULL DEFAULT TRUE,
+    retroactivo_admon        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(urbanizacion_id, anio)
 );

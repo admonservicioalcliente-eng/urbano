@@ -355,9 +355,20 @@ window.NassauDocumentos = {
                 y += 4.3;
             }
 
-            // TOTAL DE CUOTAS (suma de todas las cuotas de administración)
+            // Retroactivo Ley 675
+            const retroactivo = detalle?.retroactivo;
+            if (retroactivo && Number(retroactivo.monto || 0) > 0) {
+                doc.setFont('helvetica', 'normal');
+                doc.text(retroactivo.descripcion || 'Retroactivo Ley 675', M, y);
+                doc.text(`$${Number(retroactivo.monto).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4.3;
+            }
+
+            // TOTAL DE CUOTAS (suma de todas las cuotas de administración + retroactivo)
             let totalCuotas = 0;
             todasLasCuotas.forEach(r => { totalCuotas += r.value; });
+            const retroactivoMonto = retroactivo && Number(retroactivo.monto || 0) > 0 ? Number(retroactivo.monto) : 0;
+            totalCuotas += retroactivoMonto;
             
             // Pagos aplicados (abonos reales del propietario)
             const pagosAplicados = detalle?.pagos_aplicados || [];

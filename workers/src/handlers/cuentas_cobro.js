@@ -79,13 +79,14 @@ export async function handleCreate(request, env, user) {
   const urb = urbRows[0] || { nombre: 'EDIFICIO NASSAU P.H.', direccion: '', telefono: '', prefijo_doc: 'NAS' };
   const prefijo = urb.prefijo_doc || 'NAS';
 
-  // Traer mostrar_copia del parámetro anual activo
+  // Traer mostrar_copia y retroactivo del parámetro anual activo
   const paramRows = await query(env,
-    `SELECT mostrar_copia FROM parametros_anio
+    `SELECT mostrar_copia, retroactivo_admon FROM parametros_anio
      WHERE urbanizacion_id = $1 AND anio = EXTRACT(YEAR FROM NOW())`,
     [user.urbanizacion_id]
   );
   const mostrarCopia = paramRows[0]?.mostrar_copia !== false;
+  const retroactivoMonto = parseFloat(paramRows[0]?.retroactivo_admon) || 0;
 
   // Lock para consecutivo seguro
   const consecRows = await query(env,
@@ -190,8 +191,8 @@ export async function handleCreate(request, env, user) {
     totalExtras += parseFloat(ex.monto) || 0;
   }
 
-  // Total = deuda anterior + cuota mes actual + extras
-  const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras;
+  // Total = deuda anterior + cuota mes actual + extras + retroactivo
+  const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras + retroactivoMonto;
 
   const detalleJson = {
     mostrar_copia: mostrarCopia,
@@ -239,6 +240,10 @@ export async function handleCreate(request, env, user) {
       monto: ex.monto,
       fecha_vencimiento: ex.fecha_vencimiento
     })),
+    retroactivo: retroactivoMonto > 0 ? {
+      descripcion: 'Retroactivo Ley 675 (diferencia cuota administración)',
+      monto: retroactivoMonto
+    } : null,
     abonos: abonoAplicado > 0 ? [{
       descripcion: 'Abono inicial',
       monto: abonoAplicado,
@@ -257,6 +262,7 @@ export async function handleCreate(request, env, user) {
       saldo_anterior: Math.round(totalSaldoAnt * 100) / 100,
       intereses: Math.round(totalInteres * 100) / 100,
       cuotas_extras: Math.round(totalExtras * 100) / 100,
+      retroactivo: Math.round(retroactivoMonto * 100) / 100,
       saldo_favor: Math.round(totalSaldoFavor * 100) / 100,
       abono_inicial: Math.round(abonoAplicado * 100) / 100,
       deuda_anterior: Math.round(deudaAnterior * 100) / 100,
@@ -286,6 +292,15 @@ export async function handleCreate(request, env, user) {
   created.fecha_emision = hoy.toISOString();
   created.propietario_nombre = prop.nombre_propietario;
   created.propietario_apto = prop.apartamento;
+
+  // Limpiar retroactivo después de generar la CC (solo se cobra una vez)
+  if (retroactivoMonto > 0) {
+    await query(env,
+      `UPDATE parametros_anio SET retroactivo_admon = 0
+       WHERE urbanizacion_id = $1 AND anio = EXTRACT(YEAR FROM NOW())`,
+      [user.urbanizacion_id]
+    );
+  }
 
   return ok(created, 201);
 }
