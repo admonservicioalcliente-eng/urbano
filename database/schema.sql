@@ -245,6 +245,100 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================
+-- FUNCIÓN: calcular intereses moratorios (Ley 675 Art. 30)
+-- Cálculo DIARIO: (tasa_mensual / 30) × días_retraso × deuda
+-- ============================================================
+CREATE OR REPLACE FUNCTION calcular_intereses(p_estado_cuenta_id UUID)
+RETURNS DECIMAL(12,2) AS $$
+DECLARE
+    v_ec            RECORD;
+    v_params        RECORD;
+    v_fecha_vcto    DATE;
+    v_dias_mora     INTEGER;
+    v_tasa_diaria   DECIMAL(10,8);
+    v_deuda_base    DECIMAL(12,2);
+    v_intereses     DECIMAL(12,2);
+    v_hoy           DATE := CURRENT_DATE;
+BEGIN
+    -- Obtener el estado de cuenta
+    SELECT * INTO v_ec FROM estados_cuenta WHERE id = p_estado_cuenta_id;
+    
+    IF NOT FOUND OR v_ec.cerrado THEN
+        RETURN 0;
+    END IF;
+    
+    -- Obtener parámetros de mora
+    SELECT * INTO v_params FROM parametros_anio
+    WHERE urbanizacion_id = (
+        SELECT urbanizacion_id FROM propietarios WHERE id = v_ec.propietario_id
+    ) AND anio = v_ec.anio;
+    
+    IF NOT FOUND THEN
+        RETURN 0;
+    END IF;
+    
+    -- Calcular fecha de vencimiento
+    v_fecha_vcto := MAKE_DATE(v_ec.anio, v_ec.mes, v_params.dia_vencimiento_sin_mora);
+    
+    -- Calcular días de mora (desde día después del vencimiento)
+    IF v_hoy > v_fecha_vcto THEN
+        v_dias_mora := v_hoy - v_fecha_vcto;
+    ELSE
+        v_dias_mora := 0;
+    END IF;
+    
+    -- Si no hay días de mora, no hay intereses
+    IF v_dias_mora = 0 THEN
+        RETURN 0;
+    END IF;
+    
+    -- Calcular deuda base (cuota + saldo anterior - saldo a favor)
+    v_deuda_base := GREATEST(0, 
+        v_ec.pago_actual + v_ec.saldo_anterior - v_ec.saldo_favor
+    );
+    
+    -- Si no hay deuda, no hay intereses
+    IF v_deuda_base <= 0 THEN
+        RETURN 0;
+    END IF;
+    
+    -- Calcular tasa diaria (Ley 675: tasa mensual / 30)
+    v_tasa_diaria := v_params.tasa_mora_mensual / 30;
+    
+    -- Calcular intereses: tasa_diaria × días × deuda
+    v_intereses := v_tasa_diaria * v_dias_mora * v_deuda_base;
+    
+    -- Redondear a 2 decimales
+    v_intereses := ROUND(v_intereses, 2);
+    
+    -- Actualizar días de mora en el estado de cuenta
+    UPDATE estados_cuenta SET dias_mora = v_dias_mora WHERE id = p_estado_cuenta_id;
+    
+    RETURN v_intereses;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- FUNCIÓN: actualizar intereses de todos los meses abiertos
+-- ============================================================
+CREATE OR REPLACE FUNCTION actualizar_intereses_propietario(p_propietario_id UUID)
+RETURNS VOID AS $$
+DECLARE
+    v_ec RECORD;
+    v_intereses DECIMAL(12,2);
+BEGIN
+    FOR v_ec IN
+        SELECT id FROM estados_cuenta
+        WHERE propietario_id = p_propietario_id AND cerrado = false
+        ORDER BY anio ASC, mes ASC
+    LOOP
+        v_intereses := calcular_intereses(v_ec.id);
+        UPDATE estados_cuenta SET intereses = v_intereses WHERE id = v_ec.id;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================
 -- VISTA: resumen_propietarios (útil para dashboard)
 -- ============================================================
 CREATE OR REPLACE VIEW v_resumen_propietarios AS
