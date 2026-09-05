@@ -5,7 +5,12 @@ window.NassauAuth = {
             document.getElementById('app-shell').style.display = 'flex';
             this.updateUserInfo();
             window.NassauApp?.loadSidebarLogo();
-            window.NassauApp?.showPage('dashboard');
+            const user = this.getUser();
+            if (user?.rol === 'superadmin') {
+                window.NassauApp?.showPage('superadmin');
+            } else {
+                window.NassauApp?.showPage('dashboard');
+            }
         } else {
             this.renderLoginPage();
         }
@@ -85,14 +90,22 @@ window.NassauAuth = {
         if (user) {
             const el = document.getElementById('user-info-name');
             if (el) el.textContent = user.email || user.name || 'Usuario';
+            const isSuperadmin = user.rol === 'superadmin';
+            // Mostrar/ocultar menú SuperAdmin
             const saLink = document.querySelector('a[data-page="superadmin"]');
-            if (saLink) saLink.style.display = user.rol === 'superadmin' ? 'flex' : 'none';
-            // Título de la app = nombre de la urbanización del usuario logueado
+            if (saLink) saLink.style.display = isSuperadmin ? 'flex' : 'none';
+            // Desactivar menús de operación para superadmin
+            const operPages = ['dashboard', 'propietarios', 'pagos', 'estados', 'cobros', 'config'];
+            operPages.forEach(p => {
+                const link = document.querySelector(`a[data-page="${p}"]`);
+                if (link) link.style.display = isSuperadmin ? 'none' : 'flex';
+            });
+            // Título de la app
             const titleEl = document.getElementById('app-brand-title');
             if (titleEl) {
                 const urb = localStorage.getItem('nassau_urb_nombre') || user.urbanizacion_nombre || 'NASSAU P.H.';
-                titleEl.textContent = urb;
-                document.title = `${urb} - Administración`;
+                titleEl.textContent = isSuperadmin ? 'Panel SuperAdmin' : urb;
+                document.title = isSuperadmin ? 'SuperAdmin - Panel de Control' : `${urb} - Administración`;
             }
         }
     }
