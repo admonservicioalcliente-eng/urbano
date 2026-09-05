@@ -448,21 +448,27 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
             doc.text(`$${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
 
-            // ── Pie de copia: CONSIGNACIÓN (compacto) ─────────────────────────
+            // ── Pie de copia: CONSIGNACIÓN (2 renglones) ─────────────────────────
             const yf = Math.max(b + 100, y + 10);
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.6); doc.line(M, yf, RIGHT, yf);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(0, 0, 0);
-            doc.text('CONSIGNACIÓN PROVISIONAL', W / 2, yf + 4.5, { align: 'center' });
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-            doc.text('NEQUI  3002272559', W / 2, yf + 9, { align: 'center' });
+            
+            // Renglón 1: Datos bancarios
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+            const tipoCuenta = urb.banco_tipo_cuenta || 'ahorros';
+            const numCuenta = urb.banco_numero_cuenta || '3002272559';
+            const titular = urb.banco_titular || 'SONEIDA OSSA QUINTERO';
+            doc.text(`CONSIGNACIÓN: ${tipoCuenta.toUpperCase()} No. ${numCuenta}`, W / 2, yf + 4, { align: 'center' });
             doc.setFont('helvetica', 'bold');
-            doc.text('SONEIDA OSSA QUINTERO', W / 2, yf + 13.5, { align: 'center' });
-            doc.setFont('helvetica', 'normal');
-            doc.text('Cualquier pago favor enviar a: admonednassau@gmail.com o al cel. 300 227 25 58', W / 2, yf + 18, { align: 'center' });
-            doc.setTextColor(0, 150, 150); doc.setFont('helvetica', 'bolditalic');
-            doc.text('PAGAR CUMPLIDAMENTE NOS HACE TENER UNA MEJOR CALIDAD DE VIDA', W / 2, yf + 23, { align: 'center' });
-            doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
-            doc.setTextColor(150, 150, 150); doc.text('DOCUMENTO PROVISIONAL', W / 2, yf + 27, { align: 'center' }); doc.setTextColor(0, 0, 0);
+            doc.text(titular.toUpperCase(), W / 2, yf + 8, { align: 'center' });
+            
+            // Renglón 2: Contacto
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+            const celular = urb.banco_celular || urb.telefono || '300 227 25 58';
+            const email = urb.email || 'admonednassau@gmail.com';
+            doc.text(`Cel: ${celular} | Email: ${email}`, W / 2, yf + 12, { align: 'center' });
+            
+            doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
+            doc.text('DOCUMENTO PROVISIONAL', W / 2, yf + 16, { align: 'center' }); doc.setTextColor(0, 0, 0);
         };
 
         // ── Primera copia: ORIGINAL ─────────────────────────────────────────

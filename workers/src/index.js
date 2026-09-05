@@ -139,6 +139,7 @@ export default {
         else if (method === 'POST') res = await superadminHandler.handleCreateUrbanizacion(request, env, user);
         else if (method === 'PUT' && resourceId && subAction === 'estado') res = await superadminHandler.handleUpdateEstado(request, env, user, resourceId);
         else if (method === 'PUT' && resourceId && subAction === 'logo') res = await superadminHandler.handleUpdateLogo(request, env, user, resourceId);
+        else if (method === 'PUT' && resourceId) res = await superadminHandler.handleUpdateUrbanizacion(request, env, user, resourceId);
       } else if (path.startsWith('/api/usuarios')) {
         if (method === 'GET') res = await usuariosHandler.handleGetAll(request, env, user);
         else if (method === 'POST') res = await usuariosHandler.handleCreate(request, env, user);

@@ -49,13 +49,16 @@ export async function handleCreateUrbanizacion(request, env, user) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { nombre, direccion, nit, telefono, email, prefijo_doc } = body;
+  const { nombre, direccion, nit, telefono, email, prefijo_doc, 
+          banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular } = body;
   if (!nombre) return err(400, 'El nombre de la urbanización es obligatorio');
 
   const rows = await query(env,
-    `INSERT INTO urbanizaciones (nombre, direccion, nit, telefono, email, estado, prefijo_doc)
-     VALUES ($1, $2, $3, $4, $5, 'pendiente', $6) RETURNING *`,
-    [nombre, direccion, nit, telefono, email, prefijo_doc || 'NAS']
+    `INSERT INTO urbanizaciones (nombre, direccion, nit, telefono, email, estado, prefijo_doc,
+                                banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular)
+     VALUES ($1, $2, $3, $4, $5, 'pendiente', $6, $7, $8, $9, $10) RETURNING *`,
+    [nombre, direccion, nit, telefono, email, prefijo_doc || 'NAS',
+     banco_numero_cuenta, banco_tipo_cuenta || 'ahorros', banco_titular, banco_celular]
   );
   return ok(rows[0], 201);
 }
@@ -108,6 +111,45 @@ export async function handleUpdateLogo(request, env, user, id) {
   const rows = await query(env,
     `UPDATE urbanizaciones SET logo_base64 = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
     [logo_base64 || null, id]
+  );
+
+  if (!rows.length) return err(404, 'Urbanización no encontrada');
+  return ok(rows[0]);
+}
+
+export async function handleUpdateUrbanizacion(request, env, user, id) {
+  if (user.rol !== 'superadmin') return err(403, 'Acceso denegado');
+
+  let body;
+  try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
+
+  const { nombre, direccion, nit, telefono, email, prefijo_doc,
+          banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular } = body;
+
+  // Construir SET dinámico solo con campos definidos
+  const updates = [];
+  const values = [];
+  let idx = 1;
+
+  if (nombre !== undefined) { updates.push(`nombre = $${idx++}`); values.push(nombre); }
+  if (direccion !== undefined) { updates.push(`direccion = $${idx++}`); values.push(direccion); }
+  if (nit !== undefined) { updates.push(`nit = $${idx++}`); values.push(nit); }
+  if (telefono !== undefined) { updates.push(`telefono = $${idx++}`); values.push(telefono); }
+  if (email !== undefined) { updates.push(`email = $${idx++}`); values.push(email); }
+  if (prefijo_doc !== undefined) { updates.push(`prefijo_doc = $${idx++}`); values.push(prefijo_doc); }
+  if (banco_numero_cuenta !== undefined) { updates.push(`banco_numero_cuenta = $${idx++}`); values.push(banco_numero_cuenta); }
+  if (banco_tipo_cuenta !== undefined) { updates.push(`banco_tipo_cuenta = $${idx++}`); values.push(banco_tipo_cuenta); }
+  if (banco_titular !== undefined) { updates.push(`banco_titular = $${idx++}`); values.push(banco_titular); }
+  if (banco_celular !== undefined) { updates.push(`banco_celular = $${idx++}`); values.push(banco_celular); }
+
+  if (updates.length === 0) return err(400, 'No hay campos para actualizar');
+
+  updates.push(`updated_at = NOW()`);
+  values.push(id);
+
+  const rows = await query(env,
+    `UPDATE urbanizaciones SET ${updates.join(', ')} WHERE id = $${idx} RETURNING *`,
+    values
   );
 
   if (!rows.length) return err(404, 'Urbanización no encontrada');

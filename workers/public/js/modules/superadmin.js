@@ -224,6 +224,17 @@ window.NassauSuperAdmin = {
                 <div class="form-group"><label>Email</label><input type="email" id="sa-email"></div>
                 <div class="form-group"><label>Teléfono</label><input type="text" id="sa-tel"></div>
                 <div class="form-group"><label>Prefijo Documento</label><input type="text" id="sa-prefijo" value="NAS" maxlength="10"></div>
+                <hr style="margin: 10px 0; border-color: #ddd;">
+                <p style="font-weight: bold; margin-bottom: 10px;">Datos Bancarios (para PDF)</p>
+                <div class="form-group"><label>Número de Cuenta</label><input type="text" id="sa-cuenta"></div>
+                <div class="form-group"><label>Tipo de Cuenta</label>
+                    <select id="sa-tipo-cuenta">
+                        <option value="ahorros">Ahorros</option>
+                        <option value="corriente">Corriente</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Titular de la Cuenta</label><input type="text" id="sa-titular"></div>
+                <div class="form-group"><label>Celular de Contacto</label><input type="text" id="sa-celular"></div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
                     <button type="submit" class="btn-primary">Crear</button>
@@ -238,7 +249,11 @@ window.NassauSuperAdmin = {
             direccion: document.getElementById('sa-dir').value,
             email: document.getElementById('sa-email').value,
             telefono: document.getElementById('sa-tel').value,
-            prefijo_doc: document.getElementById('sa-prefijo').value.trim().toUpperCase() || 'NAS'
+            prefijo_doc: document.getElementById('sa-prefijo').value.trim().toUpperCase() || 'NAS',
+            banco_numero_cuenta: document.getElementById('sa-cuenta').value,
+            banco_tipo_cuenta: document.getElementById('sa-tipo-cuenta').value,
+            banco_titular: document.getElementById('sa-titular').value,
+            banco_celular: document.getElementById('sa-celular').value
         };
         try {
             window.NassauApp.showLoading(true);

@@ -71,7 +71,9 @@ export async function handleCreate(request, env, user) {
 
   // Traer datos de la urbanización
   const urbRows = await query(env,
-    `SELECT nombre, direccion, telefono, email, prefijo_doc, nit FROM urbanizaciones WHERE id = $1`,
+    `SELECT nombre, direccion, telefono, email, prefijo_doc, nit, 
+            banco_numero_cuenta, banco_tipo_cuenta, banco_titular, banco_celular 
+     FROM urbanizaciones WHERE id = $1`,
     [user.urbanizacion_id]
   );
   const urb = urbRows[0] || { nombre: 'EDIFICIO NASSAU P.H.', direccion: '', telefono: '', prefijo_doc: 'NAS' };
@@ -188,7 +190,11 @@ export async function handleCreate(request, env, user) {
       nombre: urb.nombre,
       direccion: urb.direccion,
       telefono: urb.telefono,
-      email: urb.email
+      email: urb.email,
+      banco_numero_cuenta: urb.banco_numero_cuenta,
+      banco_tipo_cuenta: urb.banco_tipo_cuenta,
+      banco_titular: urb.banco_titular,
+      banco_celular: urb.banco_celular
     },
     propietario: {
       nombre: prop.nombre_propietario,
