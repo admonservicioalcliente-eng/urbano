@@ -12,7 +12,7 @@ window.NassauConfiguracion = {
             </div>
             <div class="card table-container">
                 <table class="premium-table config-table" id="config-table">
-                    <thead><tr><th>Año</th><th>Cuota</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th></tr></thead>
+                    <thead><tr><th>Año</th><th>Cuota</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -25,7 +25,7 @@ window.NassauConfiguracion = {
             const params = await window.NassauAPI.apiGet('/parametros');
             const tbody = document.querySelector('#config-table tbody');
             if(params.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center">No hay parámetros configurados</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center">No hay parámetros configurados</td></tr>';
                 return;
             }
             tbody.innerHTML = params.map(p => {
@@ -59,6 +59,12 @@ window.NassauConfiguracion = {
                             <button class="btn-primary btn-sm config-update" data-id="${p.id}" style="display:none;">Actualizar</button>
                         </div>
                     </td>
+                    <td>
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${p.mostrar_copia !== false ? 'checked' : ''} onchange="window.NassauConfiguracion.toggleCopia('${p.id}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </td>
                 </tr>`;
             }).join('');
             tbody.querySelectorAll('.config-field').forEach(field => {
@@ -90,6 +96,13 @@ window.NassauConfiguracion = {
                     <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
                 </div>
                 <div class="form-group"><label>Día Inicio Mora</label><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
+                <div class="form-group">
+                    <label>Mostrar COPIA en PDF</label>
+                    <select id="conf-copia">
+                        <option value="true" selected>Sí (Original + Copia)</option>
+                        <option value="false">No (Solo Original)</option>
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
                     <button type="submit" class="btn-primary">Guardar</button>
@@ -106,7 +119,8 @@ window.NassauConfiguracion = {
             tasa_mora_mensual: document.getElementById('conf-tasa').value,
             dia_generacion_cuota: document.getElementById('conf-gen').value,
             dia_vencimiento_sin_mora: document.getElementById('conf-venc').value,
-            dia_inicio_mora: document.getElementById('conf-mora').value
+            dia_inicio_mora: document.getElementById('conf-mora').value,
+            mostrar_copia: document.getElementById('conf-copia').value === 'true'
         };
         try {
             window.NassauApp.showLoading(true);
@@ -164,6 +178,14 @@ window.NassauConfiguracion = {
             const proximoEl = document.getElementById(`proximo-${id}`);
             if (proximoEl) proximoEl.textContent = `${prefijo || 'NAS'}-${String(next).padStart(4, '0')}`;
             window.NassauApp.showToast(`Consecutivo actualizado a ${valor}`, 'success');
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+        finally { window.NassauApp.showLoading(false); }
+    },
+    async toggleCopia(id, checked) {
+        try {
+            window.NassauApp.showLoading(true);
+            await window.NassauAPI.apiPut(`/parametros/${id}`, { mostrar_copia: checked });
+            window.NassauApp.showToast(checked ? 'COPIA activada en PDF' : 'COPIA desactivada en PDF', 'success');
         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
         finally { window.NassauApp.showLoading(false); }
     }

@@ -79,6 +79,14 @@ export async function handleCreate(request, env, user) {
   const urb = urbRows[0] || { nombre: 'EDIFICIO NASSAU P.H.', direccion: '', telefono: '', prefijo_doc: 'NAS' };
   const prefijo = urb.prefijo_doc || 'NAS';
 
+  // Traer mostrar_copia del parámetro anual activo
+  const paramRows = await query(env,
+    `SELECT mostrar_copia FROM parametros_anio
+     WHERE urbanizacion_id = $1 AND anio = EXTRACT(YEAR FROM NOW())`,
+    [user.urbanizacion_id]
+  );
+  const mostrarCopia = paramRows[0]?.mostrar_copia !== false;
+
   // Lock para consecutivo seguro
   const consecRows = await query(env,
     `SELECT COALESCE(MAX(consecutivo), 0) + 1 AS proximo
@@ -186,6 +194,7 @@ export async function handleCreate(request, env, user) {
   const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras;
 
   const detalleJson = {
+    mostrar_copia: mostrarCopia,
     urbanizacion: {
       nombre: urb.nombre,
       direccion: urb.direccion,

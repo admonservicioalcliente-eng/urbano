@@ -20,7 +20,7 @@ export async function handleCreate(request, env, user) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { anio, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, consecutivo_comprobante } = body;
+  const { anio, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, consecutivo_comprobante, mostrar_copia } = body;
   if (!anio || tasa_mora_mensual === undefined) {
     return err(400, 'Año y Tasa de mora son obligatorios');
   }
@@ -28,8 +28,8 @@ export async function handleCreate(request, env, user) {
   const rows = await query(env,
     `INSERT INTO parametros_anio (
       urbanizacion_id, anio, tasa_mora_mensual, dia_generacion_cuota,
-      dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, mostrar_copia
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (urbanizacion_id, anio)
      DO UPDATE SET
       tasa_mora_mensual = EXCLUDED.tasa_mora_mensual,
@@ -37,7 +37,8 @@ export async function handleCreate(request, env, user) {
       dia_vencimiento_sin_mora = EXCLUDED.dia_vencimiento_sin_mora,
       dia_inicio_mora = EXCLUDED.dia_inicio_mora,
       prefijo_comprobante = EXCLUDED.prefijo_comprobante,
-      cuota_admon = EXCLUDED.cuota_admon
+      cuota_admon = EXCLUDED.cuota_admon,
+      mostrar_copia = EXCLUDED.mostrar_copia
      RETURNING *`,
     [
       user.urbanizacion_id,
@@ -47,7 +48,8 @@ export async function handleCreate(request, env, user) {
       parseInt(dia_vencimiento_sin_mora) || 5,
       parseInt(dia_inicio_mora) || 6,
       (prefijo_comprobante || 'NAS').toUpperCase().substring(0, 10),
-      parseFloat(cuota_admon) || 0
+      parseFloat(cuota_admon) || 0,
+      mostrar_copia !== false
     ]
   );
 
@@ -58,7 +60,7 @@ export async function handleUpdate(request, env, user, id) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { consecutivo_comprobante, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora } = body;
+  const { consecutivo_comprobante, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, mostrar_copia } = body;
 
   const consecutivo = consecutivo_comprobante === undefined ? null : parseInt(consecutivo_comprobante);
   if (consecutivo !== null && (isNaN(consecutivo) || consecutivo < 0)) return err(400, 'Consecutivo inválido');
@@ -69,10 +71,11 @@ export async function handleUpdate(request, env, user, id) {
        tasa_mora_mensual = COALESCE($2, tasa_mora_mensual),
        dia_generacion_cuota = COALESCE($3, dia_generacion_cuota),
        dia_vencimiento_sin_mora = COALESCE($4, dia_vencimiento_sin_mora),
-       dia_inicio_mora = COALESCE($5, dia_inicio_mora)
-     WHERE id = $6 AND (urbanizacion_id = $7 OR $8::boolean)
+       dia_inicio_mora = COALESCE($5, dia_inicio_mora),
+       mostrar_copia = COALESCE($6, mostrar_copia)
+     WHERE id = $7 AND (urbanizacion_id = $8 OR $9::boolean)
      RETURNING *`,
-    [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), id, user.urbanizacion_id, user.rol === 'superadmin']
+    [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, id, user.urbanizacion_id, user.rol === 'superadmin']
   );
   if (!rows.length) return err(404, 'Registro de configuración no encontrado');
 

@@ -41,6 +41,8 @@ export async function ensureMigrations(env) {
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_nombre VARCHAR(100)`);
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_titular VARCHAR(150)`);
       await sql.unsafe(`ALTER TABLE urbanizaciones ADD COLUMN IF NOT EXISTS banco_celular VARCHAR(20)`);
+      // Campo mostrar_copia en parametros_anio
+      await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS mostrar_copia BOOLEAN DEFAULT TRUE`);
       // Activar urbanizaciones existentes que ya estaban admitidas
       await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
 

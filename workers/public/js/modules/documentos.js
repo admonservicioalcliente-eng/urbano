@@ -476,8 +476,10 @@ window.NassauDocumentos = {
         // ── Primera copia: ORIGINAL ─────────────────────────────────────────
         drawCopy(8, 'ORIGINAL');
 
-        // ── Segunda copia: COPIA ────────────────────────────────────────────
-        drawCopy(141, 'COPIA');
+        // ── Segunda copia: COPIA (solo si está habilitada) ─────────────────
+        if (detalle?.mostrar_copia !== false) {
+            drawCopy(141, 'COPIA');
+        }
 
         doc.save(`${data.codigo || data.codigo_doc || 'documento'}.pdf`);
     }
