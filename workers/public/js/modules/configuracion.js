@@ -38,7 +38,7 @@ window.NassauConfiguracion = {
                         <div style="display:flex; flex-direction:column; gap:4px;">
                             <div class="config-dias-control">
                                 <span style="margin-right:4px;">$</span>
-                                <input type="number" step="1000" min="0" class="config-field config-cuota" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                                <input type="number" step="1000" min="0" class="config-field config-cuota" style="width:110px;" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
                             </div>
                             <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.modificarCuota('${p.id}')">Modificar</button>
                         </div>
@@ -57,7 +57,7 @@ window.NassauConfiguracion = {
                     <td><span class="badge badge-activo" id="proximo-${p.id}">${proximo}</span></td>
                     <td>
                         <div class="config-dias-control">
-                            <input type="number" step="0.01" min="0" class="config-field config-tasa" id="tasa-${p.id}" value="${p.tasa_mora_mensual}">
+                            <input type="number" step="0.01" min="0" class="config-field config-tasa" style="width:80px;" id="tasa-${p.id}" value="${p.tasa_mora_mensual}">
                             <span class="config-suffix">%</span>
                         </div>
                     </td>
