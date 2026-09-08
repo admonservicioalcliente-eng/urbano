@@ -9,11 +9,15 @@ window.NassauAPI = {
         if (token) headers['Authorization'] = `Bearer ${token}`;
         const config = { ...options, headers };
         const response = await fetch(`${window.API_BASE}${path}`, config);
-        if (response.status === 401) {
-            window.NassauAuth?.logout();
-            throw new Error('Sesi\u00f3n expirada. Por favor, inicie sesi\u00f3n nuevamente.');
-        }
         const json = await response.json();
+        if (response.status === 401) {
+            const msg = json.message || json.error || '';
+            if (msg.includes('Credenciales') || msg.includes('incorrecta')) {
+                throw new Error(msg);
+            }
+            window.NassauAuth?.logout();
+            throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+        }
         if (!response.ok) throw new Error(json.message || json.error || 'API Request Failed');
         return json.ok !== undefined ? json.data : json;
     },
