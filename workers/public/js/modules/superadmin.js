@@ -56,7 +56,7 @@ window.NassauSuperAdmin = {
             }).join('');
             document.getElementById('sa-content').innerHTML = `
                 <table class="premium-table">
-                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Urbanización</th><th>Estado</th><th>Expiración</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Urbanización</th><th>Estado</th><th>Expira</th><th>Acciones</th></tr></thead>
                     <tbody>${tbody}</tbody>
                 </table>`;
         } catch(e) { window.NassauApp.showToast(e.message || 'Error cargando usuarios', 'error'); }
@@ -108,7 +108,7 @@ window.NassauSuperAdmin = {
                     </div>
                     <div class="form-group" id="us-urb-wrap"><label>Urbanización</label><select id="us-urb"></select></div>
                 </div>
-                <div class="form-group"><label>Expiración de registro</label><input type="date" id="us-exp"></div>
+                <div class="form-group"><label>Fecha de expiración</label><input type="date" id="us-exp"></div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
                     <button type="submit" class="btn-primary">Crear</button>
@@ -149,7 +149,7 @@ window.NassauSuperAdmin = {
                     </div>
                     <div class="form-group"><label>Urbanización</label><select id="us-urb"></select></div>
                 </div>
-                <div class="form-group"><label>Expiración de registro</label><input type="date" id="us-exp" value="${exp}"></div>
+                <div class="form-group"><label>Fecha de expiración</label><input type="date" id="us-exp" value="${exp}"></div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
                     <button type="submit" class="btn-primary">Guardar</button>
