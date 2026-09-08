@@ -124,10 +124,10 @@ export async function handleCapture(request, env) {
       const captureId = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || token;
       const amount = captureData.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value || ANUAL_PRICE;
 
-      // Activate urbanizacion
+      // Activate urbanizacion - solo plan_activo, estado lo cambia el superadmin
       await query(env,
         `UPDATE urbanizaciones
-         SET estado = 'admitida', plan_activo = TRUE, fecha_pago = $1,
+         SET plan_activo = TRUE, fecha_pago = $1,
              fecha_expiracion = $2, paypal_order_id = $3, monto_pago = $4, updated_at = NOW()
          WHERE id = $5`,
         [now.toISOString(), expiry.toISOString(), captureId, parseFloat(amount), urb_id]
