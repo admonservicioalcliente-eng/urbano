@@ -19,15 +19,15 @@ export async function handleRegistroUrbanizacion(request, env) {
     if (existing.length) return err(400, 'Ya existe un usuario con ese email');
 
     const urb = await query(env,
-      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc, logo_base64)
-       VALUES ($1, $2, $3, $4, 'pendiente', $5, $6) RETURNING *`,
+      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc, logo_base64, plan_activo, fecha_expiracion)
+       VALUES ($1, $2, $3, $4, 'pendiente', $5, $6, FALSE, NOW() + INTERVAL '1 year') RETURNING *`,
       [nombre.trim(), direccion || null, telefono || null, email || null, (prefijo_doc || 'NAS').toUpperCase().substring(0, 10), logo_base64 || null]
     );
 
     const usr = await query(env,
-      `INSERT INTO usuarios (nombre, email, password_hash, rol, urbanizacion_id, activo)
-       VALUES ($1, $2, $3, 'admin_urb', $4, TRUE)
-       RETURNING id, nombre, email, rol, activo, urbanizacion_id`,
+      `INSERT INTO usuarios (nombre, email, password_hash, rol, urbanizacion_id, activo, fecha_expiracion)
+       VALUES ($1, $2, $3, 'admin_urb', $4, TRUE, NOW() + INTERVAL '1 year')
+       RETURNING id, nombre, email, rol, activo, urbanizacion_id, fecha_expiracion`,
       [admin_nombre.trim(), admin_email.toLowerCase().trim(), password_hash, urb[0].id]
     );
 
