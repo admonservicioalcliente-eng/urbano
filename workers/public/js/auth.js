@@ -171,7 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     logo_base64
                 };
                 const result = await window.NassauAPI.apiPost('/registro-urbanizacion', regData);
-                window.NassauApp?.showToast('Registro exitoso. Redirigiendo a PayPal...', 'success');
+                window.NassauApp?.showToast(`Registro exitoso. Email de acceso: ${regData.admin_email}`, 'success');
+                // Mostrar credenciales
+                alert(`REGISTRO EXITOSO\n\nUrbanización: ${regData.nombre}\nEmail de acceso: ${regData.admin_email}\nContraseña: ${regData.admin_password}\n\nGuarde estos datos para iniciar sesión.`);
 
                 const payData = await window.NassauAPI.apiPost('/paypal/create-order', {
                     urb_id: result.urbanizacion.id,

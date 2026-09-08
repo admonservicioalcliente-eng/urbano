@@ -9,6 +9,7 @@ export async function handleRegistroUrbanizacion(request, env) {
   const { nombre, direccion, telefono, email, prefijo_doc, admin_nombre, admin_email, admin_password, logo_base64 } = body;
   if (!nombre) return err(400, 'El nombre de la urbanización es obligatorio');
   if (!admin_nombre || !admin_email || !admin_password) return err(400, 'Nombre, email y contraseña del administrador son obligatorios');
+  if (!admin_email.includes('@') || !admin_email.includes('.')) return err(400, 'El email de acceso no es válido');
   if (admin_password.length < 8) return err(400, 'La contraseña debe tener al menos 8 caracteres');
 
   const password_hash = await hashPassword(admin_password);
