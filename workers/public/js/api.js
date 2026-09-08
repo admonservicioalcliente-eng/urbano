@@ -13,7 +13,8 @@ window.NassauAPI = {
         if (response.status === 401) {
             const msg = json.message || json.error || '';
             if (msg.includes('Credenciales') || msg.includes('incorrecta')) {
-                throw new Error(msg);
+                const email = options._email || '';
+                throw new Error(`Credenciales incorrectas para: ${email}`);
             }
             window.NassauAuth?.logout();
             throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
@@ -22,7 +23,7 @@ window.NassauAPI = {
         return json.ok !== undefined ? json.data : json;
     },
     apiGet(path) { return this.request(path, { method: 'GET' }); },
-    apiPost(path, body) { return this.request(path, { method: 'POST', body: JSON.stringify(body) }); },
+    apiPost(path, body, meta) { return this.request(path, { method: 'POST', body: JSON.stringify(body), ...meta }); },
     apiPut(path, body) { return this.request(path, { method: 'PUT', body: JSON.stringify(body) }); },
     apiDelete(path) { return this.request(path, { method: 'DELETE' }); }
 };

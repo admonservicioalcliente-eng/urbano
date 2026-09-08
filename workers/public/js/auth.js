@@ -51,7 +51,7 @@ window.NassauAuth = {
     async login(email, password, urb_id, cf_token) {
         try {
             window.NassauApp?.showLoading(true);
-            const data = await window.NassauAPI.apiPost('/auth/login', { email, password, urb_id, cf_token });
+            const data = await window.NassauAPI.apiPost('/auth/login', { email, password, urb_id, cf_token }, { _email: email });
             localStorage.setItem('nassau_token', data.token);
             localStorage.setItem('nassau_urb_id', urb_id);
             if (data.user?.urbanizacion_nombre) localStorage.setItem('nassau_urb_nombre', data.user.urbanizacion_nombre);
