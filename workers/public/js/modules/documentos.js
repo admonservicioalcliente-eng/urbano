@@ -61,9 +61,9 @@ window.NassauDocumentos = {
         
          let html = '';
          Object.keys(propietarios).sort((a, b) => propietarios[a].nombre.localeCompare(propietarios[b].nombre)).forEach(propId => {
-             const prop = propietarios[propId];
-             const mailto = prop.email ? `mailto:${prop.email}` : '#';
-             const whatsapp = prop.telefono ? `https://wa.me/57${prop.telefono.replace(/[^0-9]/g, '')}` : '#';
+              const prop = propietarios[propId];
+              const mailto = prop.email ? `mailto:${prop.email}` : '';
+              const wa = prop.telefono ? `https://wa.me/57${prop.telefono.replace(/[^0-9]/g, '')}` : '';
              html += `
              <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
                  <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
@@ -81,9 +81,9 @@ window.NassauDocumentos = {
                          <td><strong>${d.codigo || d.codigo_doc}</strong></td>
                          <td>${fechaStr}</td>
                          <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                          <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
-                          <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
-                          <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
+                           <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
+                           <td><button class="btn-primary btn-sm" onclick='window.open("${mailto}")'>✉ Correo</button></td>
+                           <td><button class="btn-primary btn-sm" onclick='window.open("${wa}")'>📱 WhatsApp</button></td>
                      </tr>`;
              });
              html += `
@@ -119,8 +119,8 @@ window.NassauDocumentos = {
          const propApto = prop ? (prop.propietario_apto || prop.apartamento) : '';
          const propEmail = prop ? (prop.propietario?.email || '') : '';
          const propTelefono = prop ? (prop.propietario?.telefono || '') : '';
-         const mailto = propEmail ? `mailto:${propEmail}` : '#';
-         const whatsapp = propTelefono ? `https://wa.me/57${propTelefono.replace(/[^0-9]/g, '')}` : '#';
+          const mailto = propEmail ? `mailto:${propEmail}` : '';
+          const wa = propTelefono ? `https://wa.me/57${propTelefono.replace(/[^0-9]/g, '')}` : '';
          const docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
          
          let html = `
@@ -131,20 +131,20 @@ window.NassauDocumentos = {
              <table class="premium-table" style="margin: 0;">
                  <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>PDF</th><th>Correo</th><th>WhatsApp</th></tr></thead>
                  <tbody>`;
-         docsFiltrados.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
-             const fecha = d.fecha_emision || d.fecha_generacion;
-             const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
-             const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
-              html += `
-                  <tr>
-                      <td><strong>${d.codigo || d.codigo_doc}</strong></td>
-                      <td>${fechaStr}</td>
-                      <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                      <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
-                      <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
-                      <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
-                  </tr>`;
-         });
+          docsFiltrados.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
+              const fecha = d.fecha_emision || d.fecha_generacion;
+              const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
+              const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
+               html += `
+                   <tr>
+                       <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                       <td>${fechaStr}</td>
+                       <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
+                       <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
+                       <td><button class="btn-primary btn-sm" onclick='window.open("${mailto}")'>✉ Correo</button></td>
+                       <td><button class="btn-primary btn-sm" onclick='window.open("${wa}")'>📱 WhatsApp</button></td>
+                   </tr>`;
+          });
          html += `
                  </tbody>
              </table>
