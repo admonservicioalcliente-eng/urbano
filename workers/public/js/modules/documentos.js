@@ -321,11 +321,10 @@ window.NassauDocumentos = {
                 const esMesActual = parseInt(p.mes) === new Date().getMonth() + 1 && parseInt(p.anio) === new Date().getFullYear();
                 const cuotaMes = Number(p.pago_actual || 0);
                 if (cuotaMes > 0 && !esMesActual) {
-                    const estado = p.cerrado ? 'Pagado' : (p.pendiente > 0 ? 'Pendiente' : 'Pagado');
-                    const valorMostrar = p.cerrado ? 0 : (p.pendiente || cuotaMes);
+                    const estado = p.cerrado ? 'Pagado' : 'Pendiente';
                     todasLasCuotas.push({ 
                         label: `Cuota de Administración - ${mesLabel} ${anio}`, 
-                        value: valorMostrar,
+                        value: cuotaMes,
                         estado: estado
                     });
                 }
