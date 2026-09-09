@@ -57,10 +57,18 @@ export async function handleCreate(request, env, user) {
   // Validar pertenencia
   const propRows = await query(env, `SELECT urbanizacion_id, nombre_propietario, apartamento, cuota_admon, abono_inicial, created_at FROM propietarios WHERE id = $1`, [propietario_id]);
   if (!propRows.length) return err(404, 'Propietario no encontrado');
-  const prop = propRows[0];
-  if (user.rol !== 'superadmin' && prop.urbanizacion_id !== user.urbanizacion_id) {
-    return err(403, 'Acceso denegado');
-  }
+   const prop = propRows[0];
+   if (user.rol !== 'superadmin' && prop.urbanizacion_id !== user.urbanizacion_id) {
+     return err(403, 'Acceso denegado');
+   }
+
+   const propContacto = {
+     nombre: prop.nombre_propietario,
+     apartamento: prop.apartamento,
+     cuota_admon: prop.cuota_admon,
+     email: prop.email || '',
+     telefono: prop.telefono || ''
+   };
 
   // ¿Es la primera cuenta de cobro del propietario? Si es nueva y tiene abono
   // inicial, el abono se arrastra como ítem de pago en esta primera cuenta.
@@ -150,7 +158,7 @@ export async function handleCreate(request, env, user) {
       ecs = [{
         anio: anioActual,
         mes: mesActual,
-        pago_actual: prop.cuota_admon,
+        pago_actual: propContacto.cuota_admon,
         saldo_anterior: '0',
         intereses: '0',
         saldo_favor: '0'
@@ -208,11 +216,7 @@ export async function handleCreate(request, env, user) {
       banco_titular: urb.banco_titular,
       banco_celular: urb.banco_celular
     },
-    propietario: {
-      nombre: prop.nombre_propietario,
-      apartamento: prop.apartamento,
-      cuota_admon: prop.cuota_admon
-    },
+    propietario: propContacto,
     periodos_pendientes: ecs.map(e => {
       const base = parseFloat(e.pago_actual) + parseFloat(e.saldo_anterior) + parseFloat(e.intereses);
       const favor = parseFloat(e.saldo_favor) || 0;

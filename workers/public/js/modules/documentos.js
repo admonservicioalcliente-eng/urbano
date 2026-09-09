@@ -23,17 +23,19 @@ window.NassauDocumentos = {
             window.NassauApp.showLoading(true);
             this.allDocs = await window.NassauAPI.apiGet('/cuentas-cobro');
             
-            // Agrupar por propietario
-            const propietarios = {};
-            this.allDocs.forEach(d => {
-                const propId = d.propietario_id;
-                const propNombre = d.propietario_nombre || d.nombre_propietario || 'Sin nombre';
-                const propApto = d.propietario_apto || d.apartamento || '';
-                if (!propietarios[propId]) {
-                    propietarios[propId] = { nombre: propNombre, apto: propApto, docs: [] };
-                }
-                propietarios[propId].docs.push(d);
-            });
+             // Agrupar por propietario
+             const propietarios = {};
+             this.allDocs.forEach(d => {
+                 const propId = d.propietario_id;
+                 const propNombre = d.propietario_nombre || d.nombre_propietario || 'Sin nombre';
+                 const propApto = d.propietario_apto || d.apartamento || '';
+                 const propEmail = d.propietario?.email || '';
+                 const propTelefono = d.propietario?.telefono || '';
+                 if (!propietarios[propId]) {
+                     propietarios[propId] = { nombre: propNombre, apto: propApto, email: propEmail, telefono: propTelefono, docs: [] };
+                 }
+                 propietarios[propId].docs.push(d);
+             });
             
             // Llenar select
             const select = document.getElementById('select-propietario');
@@ -57,88 +59,99 @@ window.NassauDocumentos = {
             return;
         }
         
-        let html = '';
-        Object.keys(propietarios).sort((a, b) => propietarios[a].nombre.localeCompare(propietarios[b].nombre)).forEach(propId => {
-            const prop = propietarios[propId];
-            html += `
-            <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-                <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
-                    ${prop.nombre} <small style="color: #666;">(${prop.appto})</small>
-                </div>
-                <table class="premium-table" style="margin: 0;">
-                    <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>Acciones</th></tr></thead>
-                    <tbody>`;
-            prop.docs.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
-                const fecha = d.fecha_emision || d.fecha_generacion;
-                const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
-                const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
-                html += `
-                    <tr>
-                        <td><strong>${d.codigo || d.codigo_doc}</strong></td>
-                        <td>${fechaStr}</td>
-                        <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                        <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>Imprimir / PDF</button></td>
-                    </tr>`;
-            });
-            html += `
-                    </tbody>
+         let html = '';
+         Object.keys(propietarios).sort((a, b) => propietarios[a].nombre.localeCompare(propietarios[b].nombre)).forEach(propId => {
+             const prop = propietarios[propId];
+             const mailto = prop.email ? `mailto:${prop.email}` : '#';
+             const whatsapp = prop.telefono ? `https://wa.me/57${prop.telefono.replace(/[^0-9]/g, '')}` : '#';
+             html += `
+             <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+                 <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
+                     ${prop.nombre} <small style="color: #666;">(${prop.appto})</small>
+                 </div>
+                 <table class="premium-table" style="margin: 0;">
+                     <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>Correo</th><th>WhatsApp</th></tr></thead>
+                     <tbody>`;
+             prop.docs.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
+                 const fecha = d.fecha_emision || d.fecha_generacion;
+                 const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
+                 const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
+                 html += `
+                     <tr>
+                         <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                         <td>${fechaStr}</td>
+                         <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
+                         <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
+                         <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
+                     </tr>`;
+             });
+             html += `
+                     </tbody>
+                 </table>
+             </div>`;
+         });
                 </table>
             </div>`;
         });
         container.innerHTML = html;
     },
-    filtrarPorPropietario() {
-        const propId = document.getElementById('select-propietario').value;
-        const container = document.getElementById('docs-por-propietario');
-        
-        if (!propId) {
-            // Mostrar todos agrupados
-            const propietarios = {};
-            this.allDocs.forEach(d => {
-                const pid = d.propietario_id;
-                const propNombre = d.propietario_nombre || d.nombre_propietario || 'Sin nombre';
-                const propApto = d.propietario_apto || d.apartamento || '';
-                if (!propietarios[pid]) {
-                    propietarios[pid] = { nombre: propNombre, apto: propApto, docs: [] };
-                }
-                propietarios[pid].docs.push(d);
-            });
-            this.renderListaCompleta(propietarios);
-            return;
-        }
-        
-        // Filtrar por propietario seleccionado
-        const prop = this.allDocs.find(d => d.propietario_id === propId);
-        const propNombre = prop ? (prop.propietario_nombre || prop.nombre_propietario) : '';
-        const propApto = prop ? (prop.propietario_apto || prop.apartamento) : '';
-        const docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
-        
-        let html = `
-        <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-            <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
-                ${propNombre} <small style="color: #666;">(${propApto})</small>
-            </div>
-            <table class="premium-table" style="margin: 0;">
-                <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>Acciones</th></tr></thead>
-                <tbody>`;
-        docsFiltrados.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
-            const fecha = d.fecha_emision || d.fecha_generacion;
-            const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
-            const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
-            html += `
-                <tr>
-                    <td><strong>${d.codigo || d.codigo_doc}</strong></td>
-                    <td>${fechaStr}</td>
-                    <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                    <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>Imprimir / PDF</button></td>
-                </tr>`;
-        });
-        html += `
-                </tbody>
-            </table>
-        </div>`;
-        container.innerHTML = html;
-    },
+     filtrarPorPropietario() {
+         const propId = document.getElementById('select-propietario').value;
+         const container = document.getElementById('docs-por-propietario');
+         
+         if (!propId) {
+             // Mostrar todos agrupados
+             const propietarios = {};
+             this.allDocs.forEach(d => {
+                 const pid = d.propietario_id;
+                 const propNombre = d.propietario_nombre || d.nombre_propietario || 'Sin nombre';
+                 const propApto = d.propietario_apto || d.apartamento || '';
+                 if (!propietarios[pid]) {
+                     propietarios[pid] = { nombre: propNombre, apto: propApto, docs: [] };
+                 }
+                 propietarios[pid].docs.push(d);
+             });
+             this.renderListaCompleta(propietarios);
+             return;
+         }
+         
+         // Filtrar por propietario seleccionado
+         const prop = this.allDocs.find(d => d.propietario_id === propId);
+         const propNombre = prop ? (prop.propietario_nombre || prop.nombre_propietario) : '';
+         const propApto = prop ? (prop.propietario_apto || prop.apartamento) : '';
+         const propEmail = prop ? (prop.propietario?.email || '') : '';
+         const propTelefono = prop ? (prop.propietario?.telefono || '') : '';
+         const mailto = propEmail ? `mailto:${propEmail}` : '#';
+         const whatsapp = propTelefono ? `https://wa.me/57${propTelefono.replace(/[^0-9]/g, '')}` : '#';
+         const docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
+         
+         let html = `
+         <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+             <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
+                 ${propNombre} <small style="color: #666;">(${propApto})</small>
+             </div>
+             <table class="premium-table" style="margin: 0;">
+                 <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>Correo</th><th>WhatsApp</th></tr></thead>
+                 <tbody>`;
+         docsFiltrados.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
+             const fecha = d.fecha_emision || d.fecha_generacion;
+             const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
+             const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
+             html += `
+                 <tr>
+                     <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                     <td>${fechaStr}</td>
+                     <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
+                     <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
+                     <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
+                 </tr>`;
+         });
+         html += `
+                 </tbody>
+             </table>
+         </div>`;
+         container.innerHTML = html;
+     },
     reprintPDF(d) { this.generatePDF(d); },
     verEstadoCuenta(prop) {
         window.NassauApp.showPage('estados').then(() => {
