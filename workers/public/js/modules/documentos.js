@@ -503,7 +503,7 @@ window.NassauDocumentos = {
             drawCopy(141, 'COPIA');
         }
 
-         doc.save(`${data.codigo || data.codigo_doc || 'documento'}.pdf`);
+          return doc.output('blob');
      },
      async enviarCorreo(data) {
          if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
@@ -534,5 +534,5 @@ window.NassauDocumentos = {
              }
          } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
      },
-     reprintPDF(d) { this.generatePDF(d); }
+     reprintPDF(d) { this.generatePDF(d).then(pdfBlob => { if (pdfBlob) window.open(URL.createObjectURL(pdfBlob), '_blank'); }); }
  };
