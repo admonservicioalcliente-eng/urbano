@@ -59,12 +59,10 @@ window.NassauDocumentos = {
             return;
         }
         
-         let html = '';
-         Object.keys(propietarios).sort((a, b) => propietarios[a].nombre.localeCompare(propietarios[b].nombre)).forEach(propId => {
+          let html = '';
+          Object.keys(propietarios).sort((a, b) => propietarios[a].nombre.localeCompare(propietarios[b].nombre)).forEach(propId => {
               const prop = propietarios[propId];
-              const mailto = prop.email ? `mailto:${prop.email}` : '';
-              const wa = prop.telefono ? `https://wa.me/57${prop.telefono.replace(/[^0-9]/g, '')}` : '';
-             html += `
+              html += `
              <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
                  <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
                      ${prop.nombre} <small style="color: #666;">(${prop.appto})</small>
@@ -81,9 +79,9 @@ window.NassauDocumentos = {
                          <td><strong>${d.codigo || d.codigo_doc}</strong></td>
                          <td>${fechaStr}</td>
                          <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                           <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
-                           <td><button class="btn-primary btn-sm" onclick='window.open("${mailto}")'>✉ Correo</button></td>
-                           <td><button class="btn-primary btn-sm" onclick='window.open("${wa}")'>📱 WhatsApp</button></td>
+                            <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
+                            <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarCorreo(${JSON.stringify(d).replace(/'/g, "&#39;")})'>✉ Correo</button></td>
+                            <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarWhatsApp(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📱 WhatsApp</button></td>
                      </tr>`;
              });
              html += `
@@ -117,13 +115,11 @@ window.NassauDocumentos = {
          const prop = this.allDocs.find(d => d.propietario_id === propId);
          const propNombre = prop ? (prop.propietario_nombre || prop.nombre_propietario) : '';
          const propApto = prop ? (prop.propietario_apto || prop.apartamento) : '';
-         const propEmail = prop ? (prop.propietario?.email || '') : '';
-         const propTelefono = prop ? (prop.propietario?.telefono || '') : '';
-          const mailto = propEmail ? `mailto:${propEmail}` : '';
-          const wa = propTelefono ? `https://wa.me/57${propTelefono.replace(/[^0-9]/g, '')}` : '';
-         const docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
-         
-         let html = `
+          const propEmail = prop ? (prop.propietario?.email || '') : '';
+          const propTelefono = prop ? (prop.propietario?.telefono || '') : '';
+          const docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
+          
+          let html = `
          <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
              <div style="background: #f5f5f5; padding: 0.75rem 1rem; font-weight: bold; border-bottom: 1px solid #ddd;">
                  ${propNombre} <small style="color: #666;">(${propApto})</small>
@@ -141,8 +137,8 @@ window.NassauDocumentos = {
                        <td>${fechaStr}</td>
                        <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
                        <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
-                       <td><button class="btn-primary btn-sm" onclick='window.open("${mailto}")'>✉ Correo</button></td>
-                       <td><button class="btn-primary btn-sm" onclick='window.open("${wa}")'>📱 WhatsApp</button></td>
+                        <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarCorreo(${JSON.stringify(d).replace(/'/g, "&#39;")})'>✉ Correo</button></td>
+                        <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarWhatsApp(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📱 WhatsApp</button></td>
                    </tr>`;
           });
          html += `
@@ -507,6 +503,36 @@ window.NassauDocumentos = {
             drawCopy(141, 'COPIA');
         }
 
-        doc.save(`${data.codigo || data.codigo_doc || 'documento'}.pdf`);
-    }
-};
+         doc.save(`${data.codigo || data.codigo_doc || 'documento'}.pdf`);
+     },
+     async enviarCorreo(data) {
+         if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+         if (!data.propietario?.email) { window.NassauApp.showToast('Sin email en este propietario', 'warning'); return; }
+         try {
+             const pdfBlob = await this.generatePDF(data);
+             if (pdfBlob) {
+                 const pdfDataUrl = await new Promise((resolve, reject) => {
+                     const reader = new FileReader();
+                     reader.onloadend = () => resolve(reader.result);
+                     reader.onerror = reject;
+                     reader.readAsDataURL(pdfBlob);
+                 });
+                 const mailtoLink = `mailto:${data.propietario.email}?subject=Cuenta de Cobro ${data.codigo || data.codigo_doc || ''}&body=Adjunto cuenta de cobro correspondiente.&attachment=${encodeURIComponent(pdfDataUrl)}`;
+                 window.open(mailtoLink, '_blank');
+             }
+         } catch(e) { console.error('Error enviando correo', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
+     },
+     async enviarWhatsApp(data) {
+         if (!data.propietario?.telefono) { window.NassauApp.showToast('Sin teléfono en este propietario', 'warning'); return; }
+         if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+         try {
+             const pdfBlob = await this.generatePDF(data);
+             if (pdfBlob) {
+                 const url = URL.createObjectURL(pdfBlob);
+                 const waLink = `https://wa.me/57${data.propietario.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Buen día, adjunto cuenta de cobro: ' + url)}`;
+                 window.open(waLink, '_blank');
+             }
+         } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
+     },
+     reprintPDF(d) { this.generatePDF(d); }
+ };
