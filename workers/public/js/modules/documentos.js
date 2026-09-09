@@ -70,7 +70,7 @@ window.NassauDocumentos = {
                      ${prop.nombre} <small style="color: #666;">(${prop.appto})</small>
                  </div>
                  <table class="premium-table" style="margin: 0;">
-                     <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>Correo</th><th>WhatsApp</th></tr></thead>
+                     <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>PDF</th><th>Correo</th><th>WhatsApp</th></tr></thead>
                      <tbody>`;
              prop.docs.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
                  const fecha = d.fecha_emision || d.fecha_generacion;
@@ -81,8 +81,9 @@ window.NassauDocumentos = {
                          <td><strong>${d.codigo || d.codigo_doc}</strong></td>
                          <td>${fechaStr}</td>
                          <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                         <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
-                         <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
+                          <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
+                          <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
+                          <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
                      </tr>`;
              });
              html += `
@@ -90,11 +91,8 @@ window.NassauDocumentos = {
                  </table>
              </div>`;
          });
-                </table>
-            </div>`;
-        });
-        container.innerHTML = html;
-    },
+         container.innerHTML = html;
+     },
      filtrarPorPropietario() {
          const propId = document.getElementById('select-propietario').value;
          const container = document.getElementById('docs-por-propietario');
@@ -131,20 +129,21 @@ window.NassauDocumentos = {
                  ${propNombre} <small style="color: #666;">(${propApto})</small>
              </div>
              <table class="premium-table" style="margin: 0;">
-                 <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>Correo</th><th>WhatsApp</th></tr></thead>
+                 <thead><tr><th>Código</th><th>Fecha</th><th>Total</th><th>PDF</th><th>Correo</th><th>WhatsApp</th></tr></thead>
                  <tbody>`;
          docsFiltrados.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
              const fecha = d.fecha_emision || d.fecha_generacion;
              const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
              const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
-             html += `
-                 <tr>
-                     <td><strong>${d.codigo || d.codigo_doc}</strong></td>
-                     <td>${fechaStr}</td>
-                     <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
-                     <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
-                     <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
-                 </tr>`;
+              html += `
+                  <tr>
+                      <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                      <td>${fechaStr}</td>
+                      <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
+                      <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
+                      <td><a href="${mailto}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">✉ Correo</button></a></td>
+                      <td><a href="${whatsapp}" target="_blank" style="text-decoration:none;"><button class="btn-primary btn-sm">📱 WhatsApp</button></a></td>
+                  </tr>`;
          });
          html += `
                  </tbody>
