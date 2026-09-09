@@ -98,9 +98,11 @@ export async function handleCreate(request, env, user) {
   const proximo = parseInt(consecRows[0].proximo);
   const codigoDoc = `${prefijo}${String(proximo).padStart(3, '0')}`;
 
-  // Reconciliar después de calcular intereses (una sola vez)
-  await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
+  // Reconciliación primero: aplica pagos y cierra meses cubiertos ANTES de intereses
   await reconciliarPagos(env, propietario_id);
+  // Luego calcula intereses solo sobre meses ABIERTOS restantes
+  await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
+  // YA NO se vuelve a reconciliar, para no alterar cerrado
 
   // Traer TODOS los estados (abiertos y cerrados) para el cuerpo de la CC:
   // el primer mes del propietario (mes de inicio) queda cerrado cuando el
