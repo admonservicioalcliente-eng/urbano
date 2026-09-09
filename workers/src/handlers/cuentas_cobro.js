@@ -98,8 +98,7 @@ export async function handleCreate(request, env, user) {
   const proximo = parseInt(consecRows[0].proximo);
   const codigoDoc = `${prefijo}${String(proximo).padStart(3, '0')}`;
 
-  // Reconciliar pagos y recalcular intereses al día antes de la snapshot
-  await reconciliarPagos(env, propietario_id);
+  // Reconciliar después de calcular intereses (una sola vez)
   await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
   await reconciliarPagos(env, propietario_id);
 
