@@ -81,9 +81,9 @@ export async function reconciliarPagos(env, propietarioId) {
     const aplicadoMes = Math.min(base, disponible);
     const excedenteMes = Math.max(0, disponible - base);
     const cerrado = aplicadoMes >= base;
-    // En meses cerrados: saldo_favor = monto aplicado (para que el PDF pueda mostrarlo)
-    // En meses abiertos: saldo_favor = excedente (crédito a favor)
-    const saldoFavor = cerrado ? aplicadoMes : excedenteMes;
+    // saldo_favor siempre refleja el monto aplicado al mes (para el PDF y el detalle)
+    // El excedente se suma al último mes abierto después del loop
+    const saldoFavor = aplicadoMes;
     await query(env,
       `UPDATE estados_cuenta SET saldo_favor = $1, cerrado = $2 WHERE id = $3`,
       [saldoFavor, cerrado, ec.id]

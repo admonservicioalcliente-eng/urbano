@@ -322,10 +322,14 @@ window.NassauDocumentos = {
                 const cuotaMes = Number(p.pago_actual || 0);
                 if (cuotaMes > 0 && !esMesActual) {
                     const estado = p.cerrado ? 'Pagado' : 'Pendiente';
-                    todasLasCuotas.push({ 
-                        label: `Cuota de Administración - ${mesLabel} ${anio}`, 
-                        value: cuotaMes,
-                        estado: estado
+                    const valorMostrar = p.cerrado ? 0 : (p.pendiente || cuotaMes);
+                    todasLasCuotas.push({
+                        label: `Cuota de Administración - ${mesLabel} ${anio}`,
+                        value: valorMostrar,
+                        estado: estado,
+                        total_deuda: cuotaMes,
+                        pagado: p.pagado || 0,
+                        pendiente: p.pendiente || cuotaMes
                     });
                 }
             });
