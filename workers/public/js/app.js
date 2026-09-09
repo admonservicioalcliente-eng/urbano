@@ -75,6 +75,11 @@ window.NassauApp = {
         overlay.style.display = 'flex';
     },
     closeModal() { document.getElementById('modal-overlay').style.display = 'none'; },
+    togglePassVisibility(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        input.type = input.type === 'password' ? 'text' : 'password';
+    },
     showToast(message, type = 'info') {
         const toast = document.getElementById('toast');
         toast.textContent = message; toast.className = `toast toast-${type} show`;

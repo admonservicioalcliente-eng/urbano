@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nassau P.H. - Administración</title>
+    <title>Nassau TIC - Administración</title>
     
     <!-- PWA Meta tags -->
     <meta name="theme-color" content="#f59e0b">
@@ -34,10 +34,10 @@
     <div id="login-screen">
         <div class="login-card">
             <img id="login-logo-img" src="/assets/logo.jpg" alt="Logo" class="login-logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCI+PGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiMzMzMiLz48L3N2Zz4='">
-            <h2>Nassau P.H.</h2>
+            <h2>Nassau TIC</h2>
             <form id="login-form">
                 <div class="form-group">
-                    <label>Urbanización</label>
+                    <label>Edificio</label>
                     <select id="login-urb" required></select>
                 </div>
                 <div class="form-group">
@@ -46,7 +46,10 @@
                 </div>
                 <div class="form-group">
                     <label>Contraseña</label>
-                    <input type="password" id="login-password" required>
+                    <div style="position:relative;">
+                        <input type="password" id="login-password" required>
+                        <button type="button" onclick="window.NassauApp.togglePassVisibility('login-password')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.2rem;" title="Ver contraseña">👁️</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <div class="cf-turnstile" data-sitekey="0x4AAAAAAEkSbr2_4ud3eS1H"></div>
@@ -54,10 +57,10 @@
                 <button type="submit" class="btn-primary" style="width: 100%;">Iniciar Sesión</button>
             </form>
             <div class="login-divider">o</div>
-            <button type="button" id="btn-registro-toggle" class="btn-outline" style="width: 100%;">Registrar nueva urbanización</button>
+            <button type="button" id="btn-registro-toggle" class="btn-outline" style="width: 100%;">Registrar nuevo Edificio</button>
             <form id="registro-form" style="display:none; margin-top: 1rem;">
                 <div class="form-group">
-                    <label>Nombre de la urbanización *</label>
+                    <label>Nombre del Edificio *</label>
                     <input type="text" id="reg-nombre" required>
                 </div>
                 <div class="form-group">
@@ -90,12 +93,15 @@
                 </div>
                 <div class="form-group">
                     <label>Contraseña de acceso (mín. 8 caracteres) *</label>
-                    <input type="password" id="reg-admin-password" required minlength="8">
+                    <div style="position:relative;">
+                        <input type="password" id="reg-admin-password" required minlength="8">
+                        <button type="button" onclick="window.NassauApp.togglePassVisibility('reg-admin-password')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.2rem;" title="Ver contraseña">👁️</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn-primary" style="width: 100%;">Solicitar registro</button>
             </form>
         </div>
-        <p class="login-footer">¿Es una urbanización nueva? Regístrese y el SUPERADMIN aprobará su acceso.</p>
+        <p class="login-footer">¿Es un edificio nuevo? Regístrese y el SUPERADMIN aprobará su acceso.</p>
     </div>
 
     <!-- App Shell -->
