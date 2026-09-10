@@ -532,27 +532,28 @@ window.NassauDocumentos = {
                   const fileName = `${data.codigo || data.codigo_doc || 'documento'}`;
                   window.NassauApp.showToast('Subiendo PDF...', 'info');
                   // Sube el PDF al servidor y obtiene enlace descargable
-                  let fileUrl = null;
-                  try {
-                      const pdfDataUrl = await new Promise((resolve, reject) => {
-                          const reader = new FileReader();
-                          reader.onloadend = () => resolve(reader.result);
-                          reader.onerror = reject;
-                          reader.readAsDataURL(pdfBlob);
-                      });
-                      const resp = await fetch('/api/temp-pdf', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: fileName })
-                      });
-                      if (resp.ok) {
-                          const respData = await resp.json();
-                          fileUrl = respData.url;
-                      }
-                  } catch(e) {
-                      console.warn('Servidor temp-pdf failed, using blob URL', e);
-                      fileUrl = URL.createObjectURL(pdfBlob);
-                  }
+                   let fileUrl = null;
+                   try {
+                       const pdfDataUrl = await new Promise((resolve, reject) => {
+                           const reader = new FileReader();
+                           reader.onloadend = () => resolve(reader.result);
+                           reader.onerror = reject;
+                           reader.readAsDataURL(pdfBlob);
+                       });
+                       const resp = await fetch('/api/temp-pdf', {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: fileName })
+                       });
+                       if (resp.ok) {
+                           const respData = await resp.json();
+                           fileUrl = respData.url || null;
+                       }
+                   } catch(e) { console.warn('Servidor temp-pdf failed', e); }
+                   if (!fileUrl) {
+                       fileUrl = URL.createObjectURL(pdfBlob);
+                       console.warn('Using blob URL fallback');
+                   }
                   // Descarga automáticamente el PDF
                   const a = document.createElement('a');
                   a.href = fileUrl;
