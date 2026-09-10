@@ -529,46 +529,81 @@ window.NassauDocumentos = {
           try {
               const pdfBlob = await this.generatePDF(data);
               if (pdfBlob) {
-                  const fileName = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
-                  window.NassauApp.showToast('Subiendo PDF...', 'info');
-                  // Sube el PDF al servidor y obtiene enlace descargable
-                  let fileUrl = null;
+                  const fileName = `${data.codigo || data.codigo_doc || 'documento'}`;
+                  window.NassauApp.showToast('Convirtiendo PDF a imagen...', 'info');
+                  // Convierte PDF blob a JPG usando canvas
+                  let jpgBlob = null;
                   try {
-                      const pdfDataUrl = await new Promise((resolve, reject) => {
-                          const reader = new FileReader();
-                          reader.onloadend = () => resolve(reader.result);
-                          reader.onerror = reject;
-                          reader.readAsDataURL(pdfBlob);
-                      });
+                      const objectUrl = URL.createObjectURL(pdfBlob);
+                      const img = new Image();
+                      img.onload = () => {
+                          const canvas = document.createElement('canvas');
+                          canvas.width = img.naturalWidth;
+                          canvas.height = img.naturalHeight;
+                          const ctx = canvas.getContext('2d');
+                          ctx.drawImage(img, 0, 0);
+                          canvas.toBlob((blob) => { jpgBlob = blob; }, 'image/jpeg', 0.9);
+                          URL.revokeObjectURL(objectUrl);
+                      };
+                      img.src = objectUrl;
+                      await new Promise(r => setTimeout(r, 1000));
+                  } catch(e) { console.warn('PDF-to-JPG failed', e); }
+                  // Sube el JPG al servidor y obtiene enlace descargable
+                  let fileUrl = null;
+                  let fileType = 'pdf';
+                  try {
+                      let uploadBlob = jpgBlob || pdfBlob;
+                      let uploadFileName = fileName + (jpgBlob ? '.jpg' : '.pdf');
+                      let uploadDataUrl;
+                      if (jpgBlob) {
+                          uploadDataUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(jpgBlob);
+                          });
+                      } else {
+                          uploadDataUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onloadend = () => resolve(reader.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(pdfBlob);
+                          });
+                      }
                       const resp = await fetch('/api/temp-pdf', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: data.codigo || data.codigo_doc || 'documento' })
+                          body: JSON.stringify({ pdfBase64: uploadDataUrl, codigo: uploadFileName })
                       });
                       if (resp.ok) {
                           const respData = await resp.json();
                           fileUrl = respData.url;
+                          fileType = jpgBlob ? 'jpg' : 'pdf';
                       }
                   } catch(e) {
                       console.warn('Servidor temp-pdf failed, using blob URL', e);
-                      fileUrl = URL.createObjectURL(pdfBlob);
+                      fileUrl = URL.createObjectURL(jpgBlob || pdfBlob);
                   }
+                  // Descarga automáticamente el archivo
+                  const a = document.createElement('a');
+                  a.href = fileUrl;
+                  a.download = `${fileName}.${fileType}`;
+                  a.click();
                   // Muestra el enlace en pantalla
                   const container = document.getElementById('docs-por-propietario');
                   if (container) {
                       const linkDiv = document.createElement('div');
                       linkDiv.style.cssText = 'background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:1rem;margin:0.5rem 0;';
-                      linkDiv.innerHTML = `<strong>📄 PDF:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp.</small>`;
+                      linkDiv.innerHTML = `<strong>📄 ${fileType.toUpperCase()}:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp.</small>`;
                       container.prepend(linkDiv);
                   }
-                  // Abre WhatsApp con el enlace
                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                  const waText = encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF: ' + fileUrl);
+                  const waText = encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Archivo: ' + fileUrl);
                   const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
                   window.open(waLink, '_blank');
-                  window.NassauApp.showToast('WhatsApp abierto con enlace del PDF', 'success');
+                  window.NassauApp.showToast('WhatsApp abierto con enlace del archivo', 'success');
               }
-          } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error al subir el PDF', 'error'); }
+          } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error al subir el archivo', 'error'); }
       },
       reprintPDF(d) { this.generatePDF(d).then(pdfBlob => { if (pdfBlob) window.open(URL.createObjectURL(pdfBlob), '_blank'); }); }
  };
