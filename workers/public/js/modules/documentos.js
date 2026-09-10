@@ -524,19 +524,38 @@ window.NassauDocumentos = {
           } catch(e) { console.error('Error enviando correo', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
       },
       async enviarWhatsApp(data) {
-          if (!data.propietario_telefono) { window.NassauApp.showToast('Sin teléfono en este propietario', 'warning'); return; }
           if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+          if (!data.propietario_telefono) { window.NassauApp.showToast('Sin teléfono en este propietario', 'warning'); return; }
           try {
               const pdfBlob = await this.generatePDF(data);
               if (pdfBlob) {
                   const url = URL.createObjectURL(pdfBlob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
-                  a.click();
-                  setTimeout(() => URL.revokeObjectURL(url), 5000);
+                  const fileName = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
+                  // Crea enlace visible en pantalla
+                  const container = document.getElementById('docs-por-propietario');
+                  if (container) {
+                      const linkDiv = document.createElement('div');
+                      linkDiv.style.cssText = 'background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:1rem;margin:0.5rem 0;';
+                      linkDiv.innerHTML = `
+                          <strong>📄 PDF descargado:</strong> 
+                          <a href="${url}" download="${fileName}" id="pdf-download-link">${fileName}</a>
+                          <br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp para adjuntar el PDF.</small>`;
+                      container.prepend(linkDiv);
+                      // Auto-copiar al portapapeles
+                      const a = document.getElementById('pdf-download-link');
+                      if (a) {
+                          const range = document.createRange();
+                          range.selectNodeContents(a);
+                          const sel = window.getSelection();
+                          sel.removeAllRanges();
+                          sel.addRange(range);
+                          try { document.execCommand('copy'); } catch(e) {}
+                          sel.removeAllRanges();
+                      }
+                  }
+                  setTimeout(() => URL.revokeObjectURL(url), 30000);
                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Por favor revisa el documento descargado.')}`;
+                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF con este enlace: ' + url)}`;
                   window.open(waLink, '_blank');
               }
           } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
