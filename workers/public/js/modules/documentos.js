@@ -29,11 +29,11 @@ window.NassauDocumentos = {
                  const propId = d.propietario_id;
                  const propNombre = d.propietario_nombre || d.nombre_propietario || 'Sin nombre';
                  const propApto = d.propietario_apto || d.apartamento || '';
-                 const propEmail = d.propietario?.email || '';
-                 const propTelefono = d.propietario?.telefono || '';
-                 if (!propietarios[propId]) {
-                     propietarios[propId] = { nombre: propNombre, apto: propApto, email: propEmail, telefono: propTelefono, docs: [] };
-                 }
+                  const propEmail = d.propietario_email || '';
+                  const propTelefono = d.propietario_telefono || '';
+                  if (!propietarios[propId]) {
+                      propietarios[propId] = { nombre: propNombre, apto: propApto, email: propEmail, telefono: propTelefono, docs: [] };
+                  }
                  propietarios[propId].docs.push(d);
              });
             
@@ -505,34 +505,34 @@ window.NassauDocumentos = {
 
           return doc.output('blob');
      },
-     async enviarCorreo(data) {
-         if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
-         if (!data.propietario?.email) { window.NassauApp.showToast('Sin email en este propietario', 'warning'); return; }
-         try {
-             const pdfBlob = await this.generatePDF(data);
-             if (pdfBlob) {
-                 const pdfDataUrl = await new Promise((resolve, reject) => {
-                     const reader = new FileReader();
-                     reader.onloadend = () => resolve(reader.result);
-                     reader.onerror = reject;
-                     reader.readAsDataURL(pdfBlob);
-                 });
-                 const mailtoLink = `mailto:${data.propietario.email}?subject=Cuenta de Cobro ${data.codigo || data.codigo_doc || ''}&body=Adjunto cuenta de cobro correspondiente.&attachment=${encodeURIComponent(pdfDataUrl)}`;
-                 window.open(mailtoLink, '_blank');
-             }
-         } catch(e) { console.error('Error enviando correo', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
-     },
-     async enviarWhatsApp(data) {
-         if (!data.propietario?.telefono) { window.NassauApp.showToast('Sin teléfono en este propietario', 'warning'); return; }
-         if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
-         try {
-             const pdfBlob = await this.generatePDF(data);
-             if (pdfBlob) {
-                 const url = URL.createObjectURL(pdfBlob);
-                 const waLink = `https://wa.me/57${data.propietario.telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Buen día, adjunto cuenta de cobro: ' + url)}`;
-                 window.open(waLink, '_blank');
-             }
-         } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
-     },
-     reprintPDF(d) { this.generatePDF(d).then(pdfBlob => { if (pdfBlob) window.open(URL.createObjectURL(pdfBlob), '_blank'); }); }
+      async enviarCorreo(data) {
+          if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+          if (!data.propietario_email) { window.NassauApp.showToast('Sin email en este propietario', 'warning'); return; }
+          try {
+              const pdfBlob = await this.generatePDF(data);
+              if (pdfBlob) {
+                  const pdfDataUrl = await new Promise((resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(pdfBlob);
+                  });
+                  const mailtoLink = `mailto:${data.propietario_email}?subject=Cuenta de Cobro ${data.codigo || data.codigo_doc || ''}&body=Adjunto cuenta de cobro correspondiente.&attachment=${encodeURIComponent(pdfDataUrl)}`;
+                  window.open(mailtoLink, '_blank');
+              }
+          } catch(e) { console.error('Error enviando correo', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
+      },
+      async enviarWhatsApp(data) {
+          if (!data.propietario_telefono) { window.NassauApp.showToast('Sin teléfono en este propietario', 'warning'); return; }
+          if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+          try {
+              const pdfBlob = await this.generatePDF(data);
+              if (pdfBlob) {
+                  const url = URL.createObjectURL(pdfBlob);
+                  const waLink = `https://wa.me/57${data.propietario_telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Buen día, adjunto cuenta de cobro: ' + url)}`;
+                  window.open(waLink, '_blank');
+              }
+          } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
+      },
+      reprintPDF(d) { this.generatePDF(d).then(pdfBlob => { if (pdfBlob) window.open(URL.createObjectURL(pdfBlob), '_blank'); }); }
  };
