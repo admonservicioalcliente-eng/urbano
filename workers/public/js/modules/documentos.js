@@ -529,7 +529,13 @@ window.NassauDocumentos = {
               const pdfBlob = await this.generatePDF(data);
               if (pdfBlob) {
                   const url = URL.createObjectURL(pdfBlob);
-                  const waLink = `https://wa.me/57${data.propietario_telefono.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Buen día, adjunto cuenta de cobro: ' + url)}`;
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
+                  a.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 5000);
+                  const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
+                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Por favor revisa el documento descargado.')}`;
                   window.open(waLink, '_blank');
               }
           } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
