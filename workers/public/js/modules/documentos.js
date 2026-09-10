@@ -529,33 +529,42 @@ window.NassauDocumentos = {
           try {
               const pdfBlob = await this.generatePDF(data);
               if (pdfBlob) {
-                  const url = URL.createObjectURL(pdfBlob);
                   const fileName = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
-                  // Crea enlace visible en pantalla
-                  const container = document.getElementById('docs-por-propietario');
-                  if (container) {
-                      const linkDiv = document.createElement('div');
-                      linkDiv.style.cssText = 'background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:1rem;margin:0.5rem 0;';
-                      linkDiv.innerHTML = `
-                          <strong>📄 PDF descargado:</strong> 
-                          <a href="${url}" download="${fileName}" id="pdf-download-link">${fileName}</a>
-                          <br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp para adjuntar el PDF.</small>`;
-                      container.prepend(linkDiv);
-                      // Auto-copiar al portapapeles
-                      const a = document.getElementById('pdf-download-link');
-                      if (a) {
-                          const range = document.createRange();
-                          range.selectNodeContents(a);
-                          const sel = window.getSelection();
-                          sel.removeAllRanges();
-                          sel.addRange(range);
-                          try { document.execCommand('copy'); } catch(e) {}
-                          sel.removeAllRanges();
+                  let fileUrl = null;
+                  // Usa File System Access API para guardar el PDF en una carpeta del usuario
+                  if (window.showSaveFilePicker) {
+                      try {
+                          const handle = await window.showSaveFilePicker({
+                              suggestedName: fileName,
+                              types: [{description: 'PDF', accept: {'application/pdf': ['.pdf']}}],
+                              excludeAcceptAllOption: true
+                          });
+                          const writable = await handle.createWritable();
+                          await writable.write(pdfBlob);
+                          await writable.close();
+                          // Crea un enlace clickeable al archivo guardado
+                          fileUrl = `file:///${handle.name}`;
+                          // Muestra el enlace en pantalla
+                          const container = document.getElementById('docs-por-propietario');
+                          if (container) {
+                              const linkDiv = document.createElement('div');
+                              linkDiv.style.cssText = 'background:#e3f2fd;border:1px solid #2196f3;border-radius:8px;padding:1rem;margin:0.5rem 0;';
+                              linkDiv.innerHTML = `<strong>📄 PDF guardado en:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia esta ruta y pégala en el mensaje de WhatsApp.</small>`;
+                              container.prepend(linkDiv);
+                          }
+                      } catch(e) {
+                          // User cancelled or unsupported, fallback a blob URL
+                          console.warn('showSaveFilePicker cancelled/unsupported', e);
+                          fileUrl = URL.createObjectURL(pdfBlob);
                       }
+                  } else {
+                      // Fallback: blob URL
+                      fileUrl = URL.createObjectURL(pdfBlob);
                   }
-                  setTimeout(() => URL.revokeObjectURL(url), 30000);
+                  // Abre WhatsApp con el enlace
                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF con este enlace: ' + url)}`;
+                  const waText = encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Archivo PDF: ' + fileUrl + ' - Dale clic para abrir.');
+                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
                   window.open(waLink, '_blank');
               }
           } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
