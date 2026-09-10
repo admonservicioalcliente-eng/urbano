@@ -45,10 +45,14 @@ export async function ensureMigrations(env) {
       await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS mostrar_copia BOOLEAN DEFAULT TRUE`);
       // Campo retroactivo_admon en parametros_anio (Ley 675)
       await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS retroactivo_admon DECIMAL(12,2) DEFAULT 0`);
-      // Activar urbanizaciones existentes que ya estaban admitidas
-      await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
+       // Activar urbanizaciones existentes que ya estaban admitidas
+       await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
 
-      // Función: calcular intereses moratorios (Ley 675 Art. 30 - cálculo diario)
+       // Tabla: temp_pdfs (para servir PDFs temporales)
+       await sql.unsafe(`CREATE TABLE IF NOT EXISTS temp_pdfs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), pdf_data BYTEA NOT NULL, codigo VARCHAR(20) DEFAULT 'documento', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL)`);
+       await sql.unsafe(`CREATE INDEX IF NOT EXISTS idx_temp_pdfs_expires ON temp_pdfs(expires_at)`);
+
+       // Función: calcular intereses moratorios (Ley 675 Art. 30 - cálculo diario)
       await sql.unsafe(`
         CREATE OR REPLACE FUNCTION calcular_intereses(p_estado_cuenta_id UUID)
         RETURNS DECIMAL(12,2) AS $$

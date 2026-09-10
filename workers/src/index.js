@@ -5,6 +5,7 @@ import * as propietariosHandler from './handlers/propietarios.js';
 import * as pagosHandler from './handlers/pagos.js';
 import * as estadosHandler from './handlers/estados.js';
 import * as cuentasCobroHandler from './handlers/cuentas_cobro.js';
+import * as tempPdfHandler from './handlers/temp_pdf.js';
 import * as parametrosHandler from './handlers/parametros.js';
 import * as superadminHandler from './handlers/superadmin.js';
 import * as usuariosHandler from './handlers/usuarios.js';
@@ -125,10 +126,14 @@ export default {
       } else if (path === '/api/dashboard' && method === 'GET') {
         res = await estadosHandler.handleGetDashboard(request, env, user);
       } else if (path.startsWith('/api/cuentas-cobro')) {
-        if (method === 'GET') res = await cuentasCobroHandler.handleGetAll(request, env, user);
-        else if (method === 'POST') res = await cuentasCobroHandler.handleCreate(request, env, user);
-        else if (method === 'DELETE') res = await cuentasCobroHandler.handleDeleteAll(request, env, user);
-      } else if (path.startsWith('/api/parametros')) {
+         if (method === 'GET') res = await cuentasCobroHandler.handleGetAll(request, env, user);
+         else if (method === 'POST') res = await cuentasCobroHandler.handleCreate(request, env, user);
+         else if (method === 'DELETE') res = await cuentasCobroHandler.handleDeleteAll(request, env, user);
+       } else if (path === '/api/temp-pdf' && method === 'POST') {
+         res = await tempPdfHandler.handleStore(request, env, user);
+       } else if (path.startsWith('/api/pdf/') && method === 'GET') {
+         res = await tempPdfHandler.handleGet(request, env, user);
+       } else if (path.startsWith('/api/parametros')) {
         if (method === 'GET') res = await parametrosHandler.handleGet(request, env, user);
         else if (method === 'POST') res = await parametrosHandler.handleCreate(request, env, user);
         else if (method === 'PUT' && resourceId) res = await parametrosHandler.handleUpdate(request, env, user, resourceId);

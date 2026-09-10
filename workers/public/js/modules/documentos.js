@@ -531,24 +531,26 @@ window.NassauDocumentos = {
               if (pdfBlob) {
                   const fileName = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
                   window.NassauApp.showToast('Subiendo PDF...', 'info');
-                  // Sube el PDF a transfer.sh y obtiene enlace descargable
+                  // Sube el PDF al servidor y obtiene enlace descargable
                   let fileUrl = null;
                   try {
-                      const controller = new AbortController();
-                      const timeoutId = setTimeout(() => controller.abort(), 15000);
-                      const resp = await fetch('https://transfer.sh/' + fileName, {
-                          method: 'PUT',
-                          body: pdfBlob,
-                          headers: { 'Content-Type': 'application/pdf' },
-                          signal: controller.signal
+                      const pdfDataUrl = await new Promise((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolve(reader.result);
+                          reader.onerror = reject;
+                          reader.readAsDataURL(pdfBlob);
                       });
-                      clearTimeout(timeoutId);
+                      const resp = await fetch('/api/temp-pdf', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: data.codigo || data.codigo_doc || 'documento' })
+                      });
                       if (resp.ok) {
-                          fileUrl = await resp.text();
-                          fileUrl = fileUrl.trim();
+                          const respData = await resp.json();
+                          fileUrl = respData.url;
                       }
                   } catch(e) {
-                      console.warn('transfer.sh failed, using blob URL', e);
+                      console.warn('Servidor temp-pdf failed, using blob URL', e);
                       fileUrl = URL.createObjectURL(pdfBlob);
                   }
                   // Muestra el enlace en pantalla
