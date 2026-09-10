@@ -530,25 +530,38 @@ window.NassauDocumentos = {
               const pdfBlob = await this.generatePDF(data);
               if (pdfBlob) {
                   const fileName = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
-                  // Sube el PDF a file.io y obtiene un enlace descargable
-                  const formData = new FormData();
-                  formData.append('file', pdfBlob, fileName);
                   window.NassauApp.showToast('Subiendo PDF...', 'info');
-                  const resp = await fetch('https://file.io', { method: 'POST', body: formData });
-                  const respData = await resp.json();
-                  if (!respData.success) throw new Error('upload failed');
-                  const fileUrl = respData.link;
+                  // Sube el PDF a transfer.sh y obtiene enlace descargable
+                  let fileUrl = null;
+                  try {
+                      const controller = new AbortController();
+                      const timeoutId = setTimeout(() => controller.abort(), 15000);
+                      const resp = await fetch('https://transfer.sh/' + fileName, {
+                          method: 'PUT',
+                          body: pdfBlob,
+                          headers: { 'Content-Type': 'application/pdf' },
+                          signal: controller.signal
+                      });
+                      clearTimeout(timeoutId);
+                      if (resp.ok) {
+                          fileUrl = await resp.text();
+                          fileUrl = fileUrl.trim();
+                      }
+                  } catch(e) {
+                      console.warn('transfer.sh failed, using blob URL', e);
+                      fileUrl = URL.createObjectURL(pdfBlob);
+                  }
                   // Muestra el enlace en pantalla
                   const container = document.getElementById('docs-por-propietario');
                   if (container) {
                       const linkDiv = document.createElement('div');
                       linkDiv.style.cssText = 'background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;padding:1rem;margin:0.5rem 0;';
-                      linkDiv.innerHTML = `<strong>📄 PDF subido:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp.</small>`;
+                      linkDiv.innerHTML = `<strong>📄 PDF:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp.</small>`;
                       container.prepend(linkDiv);
                   }
-                  // Abre WhatsApp con el enlace como hipertexto
+                  // Abre WhatsApp con el enlace
                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                  const waText = encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF aquí: ' + fileUrl);
+                  const waText = encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF: ' + fileUrl);
                   const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
                   window.open(waLink, '_blank');
                   window.NassauApp.showToast('WhatsApp abierto con enlace del PDF', 'success');
