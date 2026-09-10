@@ -531,29 +531,31 @@ window.NassauDocumentos = {
               if (pdfBlob) {
                   const fileName = `${data.codigo || data.codigo_doc || 'documento'}`;
                   window.NassauApp.showToast('Subiendo PDF...', 'info');
+                  // Abre ventana de WhatsApp inmediatamente (para evitar popup blocker)
+                  const waWin = window.open('about:blank', '_blank');
                   // Sube el PDF al servidor y obtiene enlace descargable
-                   let fileUrl = null;
-                   try {
-                       const pdfDataUrl = await new Promise((resolve, reject) => {
-                           const reader = new FileReader();
-                           reader.onloadend = () => resolve(reader.result);
-                           reader.onerror = reject;
-                           reader.readAsDataURL(pdfBlob);
-                       });
-                       const resp = await fetch('/api/temp-pdf', {
-                           method: 'POST',
-                           headers: { 'Content-Type': 'application/json' },
-                           body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: fileName })
-                       });
-                       if (resp.ok) {
-                           const respData = await resp.json();
-                           fileUrl = respData.url || null;
-                       }
-                   } catch(e) { console.warn('Servidor temp-pdf failed', e); }
-                   if (!fileUrl) {
-                       fileUrl = URL.createObjectURL(pdfBlob);
-                       console.warn('Using blob URL fallback');
-                   }
+                  let fileUrl = null;
+                  try {
+                      const pdfDataUrl = await new Promise((resolve, reject) => {
+                          const reader = new FileReader();
+                          reader.onloadend = () => resolve(reader.result);
+                          reader.onerror = reject;
+                          reader.readAsDataURL(pdfBlob);
+                      });
+                      const resp = await fetch('/api/temp-pdf', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: fileName })
+                      });
+                      if (resp.ok) {
+                          const respData = await resp.json();
+                          fileUrl = respData.url;
+                      }
+                  } catch(e) { console.warn('Servidor temp-pdf failed', e); }
+                  if (!fileUrl) {
+                      fileUrl = URL.createObjectURL(pdfBlob);
+                      console.warn('Using blob URL fallback');
+                  }
                   // Descarga automáticamente el PDF
                   const a = document.createElement('a');
                   a.href = fileUrl;
@@ -567,10 +569,10 @@ window.NassauDocumentos = {
                       linkDiv.innerHTML = `<strong>📄 PDF:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp.</small>`;
                       container.prepend(linkDiv);
                   }
-                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                   const waText = encodeURI('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '.\n\nSeleccionar la línea completa, copiar y pegar en el explorador para descargar el PDF.\n\n' + fileUrl);
-                   const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
-                   window.open(waLink, '_blank');
+                  const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
+                  const waText = encodeURI('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '.\n\nSeleccionar la línea completa, copiar y pegar en el explorador para descargar el PDF.\n\n' + fileUrl);
+                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
+                  waWin.location.href = waLink;
                   window.NassauApp.showToast('WhatsApp abierto con enlace del PDF', 'success');
               }
           } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error al subir el PDF', 'error'); }
