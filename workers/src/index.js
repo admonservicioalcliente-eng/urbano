@@ -85,13 +85,19 @@ export default {
             return jsonResponse({ logo: rows[0].logo_base64 }, 200, env);
           }
           return jsonResponse({ logo: null }, 200, env);
-        } catch (err) {
-          return jsonResponse({ logo: null }, 200, env);
-        }
-      }
+       } catch (err) {
+           return jsonResponse({ logo: null }, 200, env);
+       }
+       }
 
-      // Protected routes
-      const auth = await authMiddleware(request, env);
+       // Public: temp-pdf upload (sin autenticación)
+       if (path === '/api/temp-pdf' && method === 'POST') {
+         const res = await tempPdfHandler.handleStore(request, env);
+         return jsonResponse(res, 200, env);
+       }
+
+       // Protected routes
+       const auth = await authMiddleware(request, env);
       if (auth.error) {
         return errorResponse(auth.error, auth.status, env);
       }
