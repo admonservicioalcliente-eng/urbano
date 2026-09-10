@@ -511,14 +511,15 @@ window.NassauDocumentos = {
           try {
               const pdfBlob = await this.generatePDF(data);
               if (pdfBlob) {
-                  const pdfDataUrl = await new Promise((resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.onloadend = () => resolve(reader.result);
-                      reader.onerror = reject;
-                      reader.readAsDataURL(pdfBlob);
-                  });
-                  const mailtoLink = `mailto:${data.propietario_email}?subject=Cuenta de Cobro ${data.codigo || data.codigo_doc || ''}&body=Adjunto cuenta de cobro correspondiente.&attachment=${encodeURIComponent(pdfDataUrl)}`;
-                  window.open(mailtoLink, '_blank');
+                  const url = URL.createObjectURL(pdfBlob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
+                  a.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 5000);
+                  const asunto = encodeURIComponent('Cuenta de Cobro ' + (data.codigo || data.codigo_doc || ''));
+                  const cuerpo = encodeURIComponent('Adjunto cuenta de cobro correspondiente.');
+                  window.open(`mailto:${data.propietario_email}?subject=${asunto}&body=${cuerpo}`, '_blank');
               }
           } catch(e) { console.error('Error enviando correo', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
       },
