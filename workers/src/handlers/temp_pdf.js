@@ -5,11 +5,14 @@ export async function handleStore(request, env, user) {
     const { pdfBase64, codigo } = await request.json();
     if (!pdfBase64) return { error: 'pdfBase64 requerido', status: 400 };
     const id = crypto.randomUUID();
-    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+    const base64Data = pdfBase64.replace(/^data:[^;]+;base64,/, '');
+    const binaryStr = atob(base64Data);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
     await query(env, `
       INSERT INTO temp_pdfs (id, pdf_data, codigo, expires_at)
       VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour')
-    `, [id, pdfBuffer, codigo || 'documento']);
+    `, [id, bytes, codigo || 'documento']);
     return { success: true, id, url: `${env.FRONTEND_URL || 'https://nassau-api.policomputo.workers.dev'}/api/pdf/${id}` };
   } catch(e) {
     console.error('Error storing temp PDF', e);
