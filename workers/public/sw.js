@@ -1,11 +1,7 @@
-const CACHE_NAME = 'nassau-v14';
-const urlsToCache = ['/', '/css/main.css', '/js/api.js', '/js/auth.js', '/js/app.js', '/js/lib/jspdf.umd.min.js', '/js/modules/propietarios.js', '/js/modules/pagos.js', '/js/modules/estados.js', '/js/modules/documentos.js', '/js/modules/configuracion.js', '/js/modules/superadmin.js'];
+const CACHE_NAME = 'nassau-v16';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-  );
 });
 
 self.addEventListener('activate', event => {
@@ -19,12 +15,6 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.url.includes('/api')) return;
   event.respondWith(
-    fetch(event.request).then(response => {
-      if (response && response.status === 200) {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-      }
-      return response;
-    }).catch(() => caches.match(event.request))
+    fetch(event.request, { cache: 'no-store' })
   );
 });

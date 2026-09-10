@@ -542,15 +542,17 @@ window.NassauDocumentos = {
                           reader.onerror = reject;
                           reader.readAsDataURL(pdfBlob);
                       });
-                      const resp = await fetch('/api/temp-pdf', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: fileName })
-                      });
-                      if (resp.ok) {
-                          const respData = await resp.json();
-                          fileUrl = respData.url;
-                      }
+                      const resp = await fetch(`${window.API_BASE}/temp-pdf`, {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({ pdfBase64: pdfDataUrl, codigo: fileName })
+                       });
+                       if (resp.ok) {
+                           const respData = await resp.json();
+                           if (respData.ok && respData.url) {
+                               fileUrl = respData.url;
+                           }
+                       }
                   } catch(e) { console.warn('Servidor temp-pdf failed', e); }
                   if (!fileUrl) {
                       fileUrl = URL.createObjectURL(pdfBlob);

@@ -90,14 +90,29 @@ export default {
        }
        }
 
-       // Public: temp-pdf upload (sin autenticación)
-       if (path === '/api/temp-pdf' && method === 'POST') {
-         const res = await tempPdfHandler.handleStore(request, env);
-         return jsonResponse(res, 200, env);
-       }
+        // Public: temp-pdf upload (sin autenticación)
+      if (path === '/api/temp-pdf' && method === 'POST') {
+        const res = await tempPdfHandler.handleStore(request, env);
+        const status = res.status || (res.ok ? 200 : 400);
+        return jsonResponse(res, status, env);
+      }
 
-       // Protected routes
-       const auth = await authMiddleware(request, env);
+      // Public: temp-pdf download (sin autenticación, para enlaces compartidos)
+        if (path.startsWith('/api/pdf/') && method === 'GET') {
+          const res = await tempPdfHandler.handleGet(request, env);
+if (res instanceof Response) return res;
+          return jsonResponse(res, res.status || 404, env);
+        }
+
+        // Public: short URL redirect
+        if (path.startsWith('/api/s/') && method === 'GET') {
+          const id = path.split('/')[3];
+          const redirectUrl = 'https://nassau-api.policomputo.workers.dev/api/pdf/' + id;
+          return new Response(null, { status: 302, headers: { Location: redirectUrl } });
+        }
+
+        // Protected routes
+        const auth = await authMiddleware(request, env);
       if (auth.error) {
         return errorResponse(auth.error, auth.status, env);
       }
@@ -139,11 +154,7 @@ export default {
          res = await tempPdfHandler.handleStore(request, env, user);
        } else if (path.startsWith('/api/pdf/') && method === 'GET') {
          res = await tempPdfHandler.handleGet(request, env, user);
-       } else if (path.match(/^\/api\/s\/[0-9a-f-]+$/) && method === 'GET') {
-         const id = path.split('/')[3];
-         const redirectUrl = `/api/pdf/${id}`;
-         return new Response(null, { status: 302, headers: { Location: redirectUrl } });
-       } else if (path.startsWith('/api/parametros')) {
+} else if (path.startsWith('/api/parametros')) {
         if (method === 'GET') res = await parametrosHandler.handleGet(request, env, user);
         else if (method === 'POST') res = await parametrosHandler.handleCreate(request, env, user);
         else if (method === 'PUT' && resourceId) res = await parametrosHandler.handleUpdate(request, env, user, resourceId);
@@ -190,10 +201,11 @@ export default {
     }
   },
 
-  async scheduled(event, env, ctx) {
-    console.log('Cron triggered:', event.cron);
-    ctx.waitUntil(this.generateMonthlyCuotas(env));
-  },
+async scheduled(event, env, ctx) {
+     console.log('Cron triggered:', event.cron);
+     ctx.waitUntil(this.generateMonthlyCuotas(env));
+     ctx.waitUntil(tempPdfHandler.handleCleanup(env));
+   },
 
   async generateMonthlyCuotas(env) {
     const { query } = await import('./db.js');
@@ -226,3 +238,4 @@ export default {
     }
   }
 };
+

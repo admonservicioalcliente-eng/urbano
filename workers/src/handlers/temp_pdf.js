@@ -13,8 +13,8 @@ export async function handleStore(request, env, user) {
       INSERT INTO temp_pdfs (id, pdf_data, codigo, expires_at)
       VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour')
     `, [id, bytes, codigo || 'documento']);
-    const baseUrl = new URL(request.url).origin;
-     return { success: true, id, url: `${baseUrl}/s/${id}` };
+    const baseUrl = 'https://nassau-api.policomputo.workers.dev';
+     return { ok: true, id, url: `${baseUrl}/api/s/${id}` };
   } catch(e) {
     console.error('Error storing temp PDF', e);
     return { error: 'Error storing PDF', status: 500 };
@@ -26,7 +26,8 @@ export async function handleGet(request, env, user) {
     const id = request.url.split('/').pop();
     const row = await query(env, `SELECT pdf_data, codigo FROM temp_pdfs WHERE id = $1 AND expires_at > NOW()`, [id]);
     if (!row.length) return { error: 'PDF no encontrado o expirado', status: 404 };
-    return new Response(row[0].pdf_data, {
+    const pdfBytes = new Uint8Array(row[0].pdf_data);
+    return new Response(pdfBytes, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `inline; filename="${row[0].codigo || 'documento'}.pdf"`,
