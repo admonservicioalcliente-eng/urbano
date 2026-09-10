@@ -133,6 +133,10 @@ export default {
          res = await tempPdfHandler.handleStore(request, env, user);
        } else if (path.startsWith('/api/pdf/') && method === 'GET') {
          res = await tempPdfHandler.handleGet(request, env, user);
+       } else if (path.match(/^\/api\/s\/[0-9a-f-]+$/) && method === 'GET') {
+         const id = path.split('/')[3];
+         const redirectUrl = `/api/pdf/${id}`;
+         return new Response(null, { status: 302, headers: { Location: redirectUrl } });
        } else if (path.startsWith('/api/parametros')) {
         if (method === 'GET') res = await parametrosHandler.handleGet(request, env, user);
         else if (method === 'POST') res = await parametrosHandler.handleCreate(request, env, user);

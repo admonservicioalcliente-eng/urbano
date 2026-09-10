@@ -14,7 +14,7 @@ export async function handleStore(request, env, user) {
       VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour')
     `, [id, bytes, codigo || 'documento']);
     const baseUrl = new URL(request.url).origin;
-    return { success: true, id, url: `${baseUrl}/api/pdf/${id}` };
+     return { success: true, id, url: `${baseUrl}/s/${id}` };
   } catch(e) {
     console.error('Error storing temp PDF', e);
     return { error: 'Error storing PDF', status: 500 };
