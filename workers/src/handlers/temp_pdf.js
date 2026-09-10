@@ -25,7 +25,7 @@ export async function handleGet(request, env, user) {
     return new Response(row[0].pdf_data, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${row[0].codigo || 'documento'}.pdf"`,
+        'Content-Disposition': `inline; filename="${row[0].codigo || 'documento'}.pdf"`,
         'Cache-Control': 'no-cache'
       }
     });
