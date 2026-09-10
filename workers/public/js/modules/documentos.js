@@ -568,7 +568,7 @@ window.NassauDocumentos = {
                       container.prepend(linkDiv);
                   }
                    const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                   const waText = encodeURI('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF: ' + fileUrl);
+                   const waText = encodeURI('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '.\n\nSeleccionar la línea completa, copiar y pegar en el explorador para descargar el PDF.\n\n' + fileUrl);
                    const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
                    window.open(waLink, '_blank');
                   window.NassauApp.showToast('WhatsApp abierto con enlace del PDF', 'success');
