@@ -567,10 +567,10 @@ window.NassauDocumentos = {
                       linkDiv.innerHTML = `<strong>📄 PDF:</strong><br><a href="${fileUrl}" target="_blank">${fileUrl}</a><br><small style="color:#666;">Copia este enlace y pégalo en WhatsApp.</small>`;
                       container.prepend(linkDiv);
                   }
-                  const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                  const waText = encodeURIComponent('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF: ' + fileUrl);
-                  const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
-                  window.open(waLink, '_blank');
+                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
+                   const waText = encodeURI('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '. Descarga el PDF: ' + fileUrl);
+                   const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
+                   window.open(waLink, '_blank');
                   window.NassauApp.showToast('WhatsApp abierto con enlace del PDF', 'success');
               }
           } catch(e) { console.error('Error enviando WhatsApp', e); window.NassauApp.showToast('Error al subir el PDF', 'error'); }
