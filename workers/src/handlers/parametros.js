@@ -118,8 +118,9 @@ const rows = await query(env,
        retroactivo_admon = retroactivo_admon + $8
      WHERE id = $9 AND (urbanizacion_id = $10 OR $11::boolean)
      RETURNING *`,
-     [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, cuota_admon === undefined ? null : parseFloat(cuota_admon), retroactivoDelta, id, user.urbanizacion_id, user.rol === 'superadmin', cuota_extra === undefined ? null : parseFloat(cuota_extra), cuota_extra_mes_inicio === undefined ? null : parseInt(cuota_extra_mes_inicio), cuota_extra_anio_inicio === undefined ? null : parseInt(cuota_extra_anio_inicio), cuota_extra_duracion === undefined ? null : parseInt(cuota_extra_duracion)]
-  if (!rows.length) return err(404, 'Registro de configuración no encontrado');
+[consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, cuota_admon === undefined ? null : parseFloat(cuota_admon), retroactivoDelta, id, user.urbanizacion_id, user.rol === 'superadmin', cuota_extra === undefined ? null : parseFloat(cuota_extra), cuota_extra_mes_inicio === undefined ? null : parseInt(cuota_extra_mes_inicio), cuota_extra_anio_inicio === undefined ? null : parseInt(cuota_extra_anio_inicio), cuota_extra_duracion === undefined ? null : parseInt(cuota_extra_duracion)]
+   );
+   if (!rows.length) return err(404, 'Registro de configuración no encontrado');
 
   return ok(rows[0]);
 }
