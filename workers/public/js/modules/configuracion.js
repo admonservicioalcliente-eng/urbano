@@ -113,11 +113,14 @@ window.NassauConfiguracion = {
                      <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${new Date().getFullYear()}"></div>
                      <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="12"></div>
                  </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Día Generación</label><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
-                    <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
-                </div>
-                <div class="form-group"><label>Día Inicio Mora</label><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
+<div class="form-row">
+                     <div class="form-group"><label>Tasa Mora (%)</label><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
+                     <div class="form-group"><label>Día Generación</label><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
+                 </div>
+                 <div class="form-row">
+                     <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
+                     <div class="form-group"><label>Día Inicio Mora</label><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
+                 </div>
                 <div class="form-group">
                     <label>Mostrar COPIA en PDF</label>
                     <select id="conf-copia">
