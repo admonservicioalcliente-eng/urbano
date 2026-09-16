@@ -109,11 +109,11 @@ async showConfigModal() {
                  const ay = prev.cuota_extra_anio_inicio || (cy - 1);
                  const startMonth = ay * 12 + mi;
                  const nowMonth = new Date().getFullYear() * 12 + new Date().getMonth() + 1;
-                 const applied = Math.max(0, nowMonth - startMonth);
+                 const applied = Math.max(0, nowMonth - startMonth + 1);
                  const remaining = Math.max(0, dur - applied);
-                 if (remaining > 0) {
-                     cuotaExtraVal = prev.cuota_extra;
-                     cuotaExtraMes = 1;
+if (remaining > 0) {
+                     cuotaExtraVal = prevRecord.cuota_extra;
+                     cuotaExtraMes = prevRecord.cuota_extra_mes_inicio || 1;
                      cuotaExtraAnio = cy;
                      cuotaExtraDur = remaining;
                  }
