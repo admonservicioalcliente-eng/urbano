@@ -97,44 +97,66 @@ window.NassauConfiguracion = {
         } catch(e) { window.NassauApp.showToast('Error cargando configuración', 'error'); } 
         finally { window.NassauApp.showLoading(false); }
     },
-    showConfigModal() {
-        const html = `
-            <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
-                <div class="form-row">
-                    <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear()}"></div>
-                    <div class="form-group"><label>Prefijo Comprobante</label><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
-                </div>
-<div class="form-row">
-                     <div class="form-group"><label>Cuota Admín. Mensual ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
-                     <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><input type="number" step="0.01" id="conf-cuotaextra" value="0" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
-                 </div>
-                 <div class="form-row" id="conf-cuota-extra-fields" style="display:none;">
-                     <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="1"></div>
-                     <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${new Date().getFullYear()}"></div>
-                     <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="12"></div>
-                 </div>
-<div class="form-row">
-                     <div class="form-group"><label>Tasa Mora (%)</label><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
-                     <div class="form-group"><label>Día Generación</label><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
+async showConfigModal() {
+         let cuotaExtraVal = 0, cuotaExtraMes = 1, cuotaExtraAnio = new Date().getFullYear(), cuotaExtraDur = 0;
+         try {
+             const allParams = await window.NassauAPI.apiGet('/parametros');
+             const cy = new Date().getFullYear();
+             const prev = allParams.find(p => p.anio === cy - 1 && (p.cuota_extra || 0) > 0);
+             if (prev) {
+                 const mi = prev.cuota_extra_mes_inicio || 1;
+                 const dur = prev.cuota_extra_duracion || 0;
+                 const ay = prev.cuota_extra_anio_inicio || (cy - 1);
+                 const startMonth = ay * 12 + mi;
+                 const nowMonth = new Date().getFullYear() * 12 + new Date().getMonth() + 1;
+                 const applied = Math.max(0, nowMonth - startMonth);
+                 const remaining = Math.max(0, dur - applied);
+                 if (remaining > 0) {
+                     cuotaExtraVal = prev.cuota_extra;
+                     cuotaExtraMes = 1;
+                     cuotaExtraAnio = cy;
+                     cuotaExtraDur = remaining;
+                 }
+             }
+         } catch(e) { console.error('Cuota extra carry-over:', e); }
+
+         const html = `
+             <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
+                 <div class="form-row">
+                     <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear()}"></div>
+                     <div class="form-group"><label>Prefijo Comprobante</label><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
                  </div>
                  <div class="form-row">
-                     <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
-                     <div class="form-group"><label>Día Inicio Mora</label><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
+                      <div class="form-group"><label>Cuota Admín. Mensual ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
+                      <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
+                  </div>
+                  <div class="form-row" id="conf-cuota-extra-fields" style="display:${cuotaExtraVal > 0 ? '' : 'none'};">
+                      <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="${cuotaExtraMes}"></div>
+                      <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${cuotaExtraAnio}"></div>
+                      <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="${cuotaExtraDur}"></div>
+                  </div>
+                  <div class="form-row">
+                      <div class="form-group"><label>Tasa Mora (%)</label><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
+                      <div class="form-group"><label>Día Generación</label><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
+                  </div>
+                  <div class="form-row">
+                      <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
+                      <div class="form-group"><label>Día Inicio Mora</label><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
+                  </div>
+                 <div class="form-group">
+                     <label>Mostrar COPIA en PDF</label>
+                     <select id="conf-copia">
+                         <option value="true" selected>Sí (Original + Copia)</option>
+                         <option value="false">No (Solo Original)</option>
+                     </select>
                  </div>
-                <div class="form-group">
-                    <label>Mostrar COPIA en PDF</label>
-                    <select id="conf-copia">
-                        <option value="true" selected>Sí (Original + Copia)</option>
-                        <option value="false">No (Solo Original)</option>
-                    </select>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
-                    <button type="submit" class="btn-primary">Guardar</button>
-                </div>
-            </form>`;
-        window.NassauApp.showModal('Configurar Parámetros', html);
-    },
+                 <div class="form-actions">
+                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
+                     <button type="submit" class="btn-primary">Guardar</button>
+                 </div>
+             </form>`;
+         window.NassauApp.showModal('Configurar Parámetros', html);
+     },
 async saveConfig(e) {
          e.preventDefault();
          const cuotaExtra = parseFloat(document.getElementById('conf-cuotaextra').value) || 0;
