@@ -17,55 +17,64 @@ export async function handleGet(request, env, user) {
 }
 
 export async function handleCreate(request, env, user) {
+  console.log('HANDLE_CREATE called');
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
+  console.log('BODY:', JSON.stringify(body));
 
   const { anio, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, consecutivo_comprobante, mostrar_copia, cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion } = body;
   if (!anio || tasa_mora_mensual === undefined) {
     return err(400, 'Año y Tasa de mora son obligatorios');
   }
 
-  const rows = await query(env,
-`INSERT INTO parametros_anio (
-      urbanizacion_id, anio, tasa_mora_mensual, dia_generacion_cuota,
-      dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, mostrar_copia,
-      cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      ON CONFLICT (urbanizacion_id, anio)
-      DO UPDATE SET
-       tasa_mora_mensual = EXCLUDED.tasa_mora_mensual,
-       dia_generacion_cuota = EXCLUDED.dia_generacion_cuota,
-       dia_vencimiento_sin_mora = EXCLUDED.dia_vencimiento_sin_mora,
-       dia_inicio_mora = EXCLUDED.dia_inicio_mora,
-       prefijo_comprobante = EXCLUDED.prefijo_comprobante,
-       cuota_admon = EXCLUDED.cuota_admon,
-       mostrar_copia = EXCLUDED.mostrar_copia,
-       cuota_extra = EXCLUDED.cuota_extra,
-       cuota_extra_mes_inicio = EXCLUDED.cuota_extra_mes_inicio,
-       cuota_extra_anio_inicio = EXCLUDED.cuota_extra_anio_inicio,
-       cuota_extra_duracion = EXCLUDED.cuota_extra_duracion
-      RETURNING *`,
-     [
-       user.urbanizacion_id,
-       parseInt(anio),
-       parseFloat(tasa_mora_mensual),
-       parseInt(dia_generacion_cuota) || 1,
-       parseInt(dia_vencimiento_sin_mora) || 5,
-       parseInt(dia_inicio_mora) || 6,
-       (prefijo_comprobante || 'NAS').toUpperCase().substring(0, 10),
-       parseFloat(cuota_admon) || 0,
-       mostrar_copia !== false,
-       parseFloat(cuota_extra) || 0,
-       parseInt(cuota_extra_mes_inicio) || 0,
-       parseInt(cuota_extra_anio_inicio) || 0,
-       parseInt(cuota_extra_duracion) || 0
-     ]
-  );
-
+  let rows;
+  try {
+    rows = await query(env,
+     `INSERT INTO parametros_anio (
+           urbanizacion_id, anio, tasa_mora_mensual, dia_generacion_cuota,
+           dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, mostrar_copia,
+           cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           ON CONFLICT (urbanizacion_id, anio)
+           DO UPDATE SET
+            tasa_mora_mensual = EXCLUDED.tasa_mora_mensual,
+            dia_generacion_cuota = EXCLUDED.dia_generacion_cuota,
+            dia_vencimiento_sin_mora = EXCLUDED.dia_vencimiento_sin_mora,
+            dia_inicio_mora = EXCLUDED.dia_inicio_mora,
+            prefijo_comprobante = EXCLUDED.prefijo_comprobante,
+            cuota_admon = EXCLUDED.cuota_admon,
+            mostrar_copia = EXCLUDED.mostrar_copia,
+            cuota_extra = EXCLUDED.cuota_extra,
+            cuota_extra_mes_inicio = EXCLUDED.cuota_extra_mes_inicio,
+            cuota_extra_anio_inicio = EXCLUDED.cuota_extra_anio_inicio,
+            cuota_extra_duracion = EXCLUDED.cuota_extra_duracion
+           RETURNING *`,
+          [
+            user.urbanizacion_id,
+            parseInt(anio),
+            parseFloat(tasa_mora_mensual),
+            parseInt(dia_generacion_cuota) || 1,
+            parseInt(dia_vencimiento_sin_mora) || 5,
+            parseInt(dia_inicio_mora) || 6,
+            (prefijo_comprobante || 'NAS').toUpperCase().substring(0, 10),
+            parseFloat(cuota_admon) || 0,
+            mostrar_copia !== false,
+            parseFloat(cuota_extra) || 0,
+            parseInt(cuota_extra_mes_inicio) || 0,
+            parseInt(cuota_extra_anio_inicio) || 0,
+            parseInt(cuota_extra_duracion) || 0
+          ]
+     );
+     console.log('CREATE rows:', rows.length);
+  } catch(e) {
+     console.error('CREATE err:', e);
+     return err(500, e.message);
+  }
   return ok(rows[0]);
 }
 
 export async function handleUpdate(request, env, user, id) {
+  console.log('HANDLE_UPDATE called, id:', id);
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
@@ -74,7 +83,6 @@ export async function handleUpdate(request, env, user, id) {
   const consecutivo = consecutivo_comprobante === undefined ? null : parseInt(consecutivo_comprobante);
   if (consecutivo !== null && (isNaN(consecutivo) || consecutivo < 0)) return err(400, 'Consecutivo inválido');
 
-  // Si cambia cuota_admon, calcular retroactivo (Ley 675)
   let retroactivoDelta = 0;
   if (cuota_admon !== undefined) {
     const current = await query(env,
@@ -87,7 +95,6 @@ export async function handleUpdate(request, env, user, id) {
       if (nueva > vieja && vieja > 0) {
         const anioParam = current[0].anio;
         const urbId = current[0].urbanizacion_id;
-        // Contar meses cerrados de ese año
         const cerrados = await query(env,
           `SELECT COUNT(*) AS n FROM estados_cuenta ec
            JOIN propietarios p ON p.id = ec.propietario_id
@@ -102,27 +109,32 @@ export async function handleUpdate(request, env, user, id) {
     }
   }
 
-const rows = await query(env,
-    `UPDATE parametros_anio SET
-       consecutivo_comprobante = COALESCE($1, consecutivo_comprobante),
-       tasa_mora_mensual = COALESCE($2, tasa_mora_mensual),
-       dia_generacion_cuota = COALESCE($3, dia_generacion_cuota),
-       dia_vencimiento_sin_mora = COALESCE($4, dia_vencimiento_sin_mora),
-       dia_inicio_mora = COALESCE($5, dia_inicio_mora),
-       mostrar_copia = COALESCE($6, mostrar_copia),
-       cuota_admon = COALESCE($7, cuota_admon),
-cuota_extra = COALESCE($12, cuota_extra),
+  let rows;
+  try {
+    rows = await query(env,
+     `UPDATE parametros_anio SET
+        consecutivo_comprobante = COALESCE($1, consecutivo_comprobante),
+        tasa_mora_mensual = COALESCE($2, tasa_mora_mensual),
+        dia_generacion_cuota = COALESCE($3, dia_generacion_cuota),
+        dia_vencimiento_sin_mora = COALESCE($4, dia_vencimiento_sin_mora),
+        dia_inicio_mora = COALESCE($5, dia_inicio_mora),
+        mostrar_copia = COALESCE($6, mostrar_copia),
+        cuota_admon = COALESCE($7, cuota_admon),
+        cuota_extra = COALESCE($12, cuota_extra),
         cuota_extra_mes_inicio = COALESCE($13, cuota_extra_mes_inicio),
         cuota_extra_anio_inicio = COALESCE($14, cuota_extra_anio_inicio),
         cuota_extra_duracion = COALESCE($15, cuota_extra_duracion),
-       retroactivo_admon = retroactivo_admon + $8
-     WHERE id = $9 AND (urbanizacion_id = $10 OR $11::boolean)
-     RETURNING *`,
-[consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, cuota_admon === undefined ? null : parseFloat(cuota_admon), retroactivoDelta, id, user.urbanizacion_id, user.rol === 'superadmin', cuota_extra === undefined ? null : parseFloat(cuota_extra), cuota_extra_mes_inicio === undefined ? null : parseInt(cuota_extra_mes_inicio), cuota_extra_anio_inicio === undefined ? null : parseInt(cuota_extra_anio_inicio), cuota_extra_duracion === undefined ? null : parseInt(cuota_extra_duracion)]
-   );
-   if (!rows.length) return err(404, 'Registro de configuración no encontrado');
-
-  return ok(rows[0]);
+        retroactivo_admon = retroactivo_admon + $8
+      WHERE id = $9 AND (urbanizacion_id = $10 OR $11::boolean)
+      RETURNING *`,
+     [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, cuota_admon === undefined ? null : parseFloat(cuota_admon), retroactivoDelta, id, user.urbanizacion_id, user.rol === 'superadmin', cuota_extra === undefined ? null : parseFloat(cuota_extra), cuota_extra_mes_inicio === undefined ? null : parseInt(cuota_extra_mes_inicio), cuota_extra_anio_inicio === undefined ? null : parseInt(cuota_extra_anio_inicio), cuota_extra_duracion === undefined ? null : parseInt(cuota_extra_duracion)]
+    );
+    if (!rows.length) return err(404, 'Registro de configuración no encontrado');
+    return ok(rows[0]);
+  } catch(e) {
+     console.error('UPDATE err:', e);
+     return err(500, e.message);
+  }
 }
 
 export async function handleGenerarCuotas(request, env, user) {
@@ -134,7 +146,6 @@ export async function handleGenerarCuotas(request, env, user) {
   const mes = body.mes || (hoy.getMonth() + 1);
 
   try {
-    // Llamar al stored procedure de PostgreSQL
     const res = await query(env,
       `SELECT generar_cuotas_mes($1, $2, $3) AS creadas`,
       [user.urbanizacion_id, parseInt(anio), parseInt(mes)]
