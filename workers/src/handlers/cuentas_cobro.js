@@ -89,14 +89,15 @@ export async function handleCreate(request, env, user) {
   const urb = urbRows[0] || { nombre: 'EDIFICIO NASSAU P.H.', direccion: '', telefono: '', prefijo_doc: 'NAS' };
   const prefijo = urb.prefijo_doc || 'NAS';
 
-  // Traer mostrar_copia y retroactivo del parámetro anual activo
-  const paramRows = await query(env,
-    `SELECT mostrar_copia, retroactivo_admon FROM parametros_anio
-     WHERE urbanizacion_id = $1 AND anio = EXTRACT(YEAR FROM NOW())`,
-    [user.urbanizacion_id]
-  );
-  const mostrarCopia = paramRows[0]?.mostrar_copia !== false;
-  const retroactivoMonto = parseFloat(paramRows[0]?.retroactivo_admon) || 0;
+// Traer parametros del parámetro anual activo
+   const paramRows = await query(env,
+     `SELECT mostrar_copia, retroactivo_admon, cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion FROM parametros_anio
+      WHERE urbanizacion_id = $1 AND anio = EXTRACT(YEAR FROM NOW())`,
+     [user.urbanizacion_id]
+   );
+   const mostrarCopia = paramRows[0]?.mostrar_copia !== false;
+   const retroactivoMonto = parseFloat(paramRows[0]?.retroactivo_admon) || 0;
+   const cuotaExtra = parseFloat(paramRows[0]?.cuota_extra) || 0;
 
   // Lock para consecutivo seguro
   const consecRows = await query(env,
@@ -202,12 +203,16 @@ export async function handleCreate(request, env, user) {
     totalExtras += parseFloat(ex.monto) || 0;
   }
 
-  // Total = deuda anterior + cuota mes actual + extras + retroactivo
-  const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras + retroactivoMonto;
+// Total = deuda anterior + cuota mes actual + extras + retroactivo + cuota_extra
+   const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras + retroactivoMonto + cuotaExtra;
 
-  const detalleJson = {
-    mostrar_copia: mostrarCopia,
-    urbanizacion: {
+const detalleJson = {
+     mostrar_copia: mostrarCopia,
+     cuota_extra: cuotaExtra,
+     cuota_extra_mes_inicio: paramRows[0]?.cuota_extra_mes_inicio || 0,
+     cuota_extra_anio_inicio: paramRows[0]?.cuota_extra_anio_inicio || 0,
+     cuota_extra_duracion: paramRows[0]?.cuota_extra_duracion || 0,
+     urbanizacion: {
       nombre: urb.nombre,
       direccion: urb.direccion,
       telefono: urb.telefono,
@@ -265,18 +270,19 @@ export async function handleCreate(request, env, user) {
       descripcion: pg.descripcion
     })),
     total_pagos: Math.round(totalPagos * 100) / 100,
-    totales: {
-      cuota_admon: Math.round(totalCuota * 100) / 100,
-      saldo_anterior: Math.round(totalSaldoAnt * 100) / 100,
-      intereses: Math.round(totalInteres * 100) / 100,
-      cuotas_extras: Math.round(totalExtras * 100) / 100,
-      retroactivo: Math.round(retroactivoMonto * 100) / 100,
-      saldo_favor: Math.round(totalSaldoFavor * 100) / 100,
-      abono_inicial: Math.round(abonoAplicado * 100) / 100,
-      deuda_anterior: Math.round(deudaAnterior * 100) / 100,
-      cuota_mes_actual: Math.round(cuotaMesActual * 100) / 100,
-      total: Math.round(totalDeuda * 100) / 100
-    },
+totales: {
+       cuota_admon: Math.round(totalCuota * 100) / 100,
+       saldo_anterior: Math.round(totalSaldoAnt * 100) / 100,
+       intereses: Math.round(totalInteres * 100) / 100,
+       cuotas_extras: Math.round(totalExtras * 100) / 100,
+       retroactivo: Math.round(retroactivoMonto * 100) / 100,
+       saldo_favor: Math.round(totalSaldoFavor * 100) / 100,
+       abono_inicial: Math.round(abonoAplicado * 100) / 100,
+       deuda_anterior: Math.round(deudaAnterior * 100) / 100,
+       cuota_mes_actual: Math.round(cuotaMesActual * 100) / 100,
+       cuota_extra: Math.round(cuotaExtra * 100) / 100,
+       total: Math.round(totalDeuda * 100) / 100
+     },
     cuenta_bancaria: {
       banco: 'NEQUI',
       tipo: 'Cuenta',

@@ -375,11 +375,29 @@ window.NassauDocumentos = {
                 y += 4.3;
             }
 
-            // TOTAL DE CUOTAS (suma de todas las cuotas de administración + retroactivo)
-            let totalCuotas = 0;
-            todasLasCuotas.forEach(r => { totalCuotas += r.value; });
-            const retroactivoMonto = retroactivo && Number(retroactivo.monto || 0) > 0 ? Number(retroactivo.monto) : 0;
-            totalCuotas += retroactivoMonto;
+// Cuota Extra (verificar si aplica al mes actual)
+             const cuotaExtraVal = Number(detalle?.cuota_extra || 0);
+             const ceMesInicio = parseInt(detalle?.cuota_extra_mes_inicio) || 0;
+             const ceAnioInicio = parseInt(detalle?.cuota_extra_anio_inicio) || 0;
+             const ceDuracion = parseInt(detalle?.cuota_extra_duracion) || 0;
+             const mesActual = new Date().getMonth() + 1;
+             const anioActual = new Date().getFullYear();
+             const aplicaCuotaExtra = cuotaExtraVal > 0 && ceMesInicio > 0 && ceAnioInicio > 0 && ceDuracion > 0 &&
+                 (anioActual - ceAnioInicio) * 12 + mesActual >= ceAnioInicio * 12 + ceMesInicio &&
+                 (anioActual - ceAnioInicio) * 12 + mesActual <= ceAnioInicio * 12 + ceMesInicio + ceDuracion - 1;
+             if (aplicaCuotaExtra) {
+                 doc.setFont('helvetica', 'normal');
+                 doc.text('Cuota Extra', M, y);
+                 doc.text(`$${cuotaExtraVal.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                 y += 4.3;
+             }
+
+             // TOTAL DE CUOTAS (suma de todas las cuotas de administración + retroactivo + cuota extra)
+             let totalCuotas = 0;
+             todasLasCuotas.forEach(r => { totalCuotas += r.value; });
+             const retroactivoMonto = retroactivo && Number(retroactivo.monto || 0) > 0 ? Number(retroactivo.monto) : 0;
+             const cuotaExtraMonto = aplicaCuotaExtra ? cuotaExtraVal : 0;
+             totalCuotas += retroactivoMonto + cuotaExtraMonto;
             
             // Pagos aplicados (abonos reales del propietario)
             const pagosAplicados = detalle?.pagos_aplicados || [];

@@ -1,0 +1,101 @@
+[
+  {
+    "Nombre": "Administración de Conjuntos Residenciales Laureles",
+    "Teléfono": "+57313 555 7890",
+    "Email": "laureles@admin.com.co",
+    "Sitio Web": "https://laureles-admin.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Administración de Edificios Envigado",
+    "Teléfono": "+57315 111 4444",
+    "Email": "envigado@adminedificios.com",
+    "Sitio Web": "https://envigado-edificios.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Administradores de Edificios Oriente",
+    "Teléfono": "+57312 987 6543",
+    "Email": "admin@oriente.com.co",
+    "Sitio Web": "https://edificiosoriente.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Administradores de Propiedad Horizontal de Medellín S.A.S.",
+    "Teléfono": "+574 444 5555",
+    "Email": "info@aphmedellin.com",
+    "Sitio Web": "https://aphmedellin.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Administradores de Torres del Poblado",
+    "Teléfono": "+574 333 4444",
+    "Email": "poblado@adminmed.com",
+    "Sitio Web": "https://torrespoblado.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Edificios & Negocios Medellín",
+    "Teléfono": "+57311 999 8888",
+    "Email": "contacto@edificiosmedellin.com",
+    "Sitio Web": "https://edificiosmedellin.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Gestión Inmobiliaria Medellín S.A.S.",
+    "Teléfono": "+57310 123 4567",
+    "Email": "contacto@gestionmedellin.com",
+    "Sitio Web": "https://gestionmedellin.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Gestión Vertical Medellín",
+    "Teléfono": "+57314 222 3333",
+    "Email": "info@gestionvertical.com",
+    "Sitio Web": "https://gestionvertical.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Propiedad Horizontal Sabaneta",
+    "Teléfono": "+57316 555 6666",
+    "Email": "sabaneta@phsabaneta.com",
+    "Sitio Web": "https://phsabaneta.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  },
+  {
+    "Nombre": "Red de Administradores de PH de Antioquia",
+    "Teléfono": "+574 604 4400",
+    "Email": "info@redpropiedadhorizontal.com",
+    "Sitio Web": "https://redpropiedadhorizontal.com",
+    "Ciudad": "Medellín",
+    "Fuente": "redpropiedadhorizontal.com",
+    "URL": "https://redpropiedadhorizontal.com/red-administradores-propiedad-horizontal/"
+  },
+  {
+    "Nombre": "Servicios de Administración PH Antioquia",
+    "Teléfono": "+574 555 1234",
+    "Email": "info@phantioquia.com.co",
+    "Sitio Web": "https://phantioquia.com.co",
+    "Ciudad": "Medellín",
+    "Fuente": "Demo",
+    "URL": "Demo"
+  }
+]

@@ -12,7 +12,7 @@ window.NassauConfiguracion = {
             </div>
             <div class="card table-container">
                 <table class="premium-table config-table" id="config-table">
-                    <thead><tr><th>Año</th><th>Cuota</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th></tr></thead>
+                    <thead><tr><th>Año</th><th>Cuota</th><th>Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -33,16 +33,23 @@ window.NassauConfiguracion = {
                 const proximo = `${p.prefijo_comprobante || 'NAS'}-${String(nextConsec).padStart(4, '0')}`;
                 return `
                 <tr>
-                    <td><strong>${p.anio}</strong></td>
-                    <td>
-                        <div style="display:flex; flex-direction:column; gap:4px;">
-                            <div class="config-dias-control">
-                                <span style="margin-right:4px;">$</span>
-                                <input type="number" step="1000" min="0" class="config-field config-cuota" style="width:110px;" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
-                            </div>
-                            <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.modificarCuota('${p.id}')">Modificar</button>
-                        </div>
-                    </td>
+<td><strong>${p.anio}</strong></td>
+                     <td>
+                         <div style="display:flex; flex-direction:column; gap:4px;">
+                             <div class="config-dias-control">
+                                 <span style="margin-right:4px;">$</span>
+                                 <input type="number" step="1000" min="0" class="config-field config-cuota" style="width:110px;" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                             </div>
+                             <div class="config-dias-control">
+                                 <span style="margin-right:4px;">+</span>
+                                 <input type="number" step="1000" min="0" class="config-field config-cuota-extra" style="width:110px;" id="cuotaextra-${p.id}" value="${p.cuota_extra || 0}" placeholder="$0">
+                                 <input type="number" min="1" max="12" class="config-field config-gen-extra" style="width:60px;" id="cemes-${p.id}" value="${p.cuota_extra_mes_inicio || ''}" placeholder="mes">
+                                 <input type="number" min="2020" class="config-field config-gen-extra" style="width:70px;" id="ceanio-${p.id}" value="${p.cuota_extra_anio_inicio || ''}" placeholder="año">
+                                 <input type="number" min="1" max="60" class="config-field config-gen-extra" style="width:50px;" id="cedur-${p.id}" value="${p.cuota_extra_duracion || ''}" placeholder="meses">
+                             </div>
+                             <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.modificarCuota('${p.id}')">Modificar</button>
+                         </div>
+                     </td>
                     <td><span class="badge badge-activo">${p.prefijo_comprobante || 'NAS'}</span></td>
                     <td>
                         <div style="display:flex; flex-direction:column; gap:4px;">
@@ -97,10 +104,15 @@ window.NassauConfiguracion = {
                     <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear()}"></div>
                     <div class="form-group"><label>Prefijo Comprobante</label><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Cuota Admín. Mensual ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
-                    <div class="form-group"><label>Tasa Mora Mensual (%)</label><input type="number" step="0.01" id="conf-tasa" required value="1.5"></div>
-                </div>
+<div class="form-row">
+                     <div class="form-group"><label>Cuota Admín. Mensual ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
+                     <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><input type="number" step="0.01" id="conf-cuotaextra" value="0" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
+                 </div>
+                 <div class="form-row" id="conf-cuota-extra-fields" style="display:none;">
+                     <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="1"></div>
+                     <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${new Date().getFullYear()}"></div>
+                     <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="12"></div>
+                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>Día Generación</label><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
                     <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
@@ -120,18 +132,24 @@ window.NassauConfiguracion = {
             </form>`;
         window.NassauApp.showModal('Configurar Parámetros', html);
     },
-    async saveConfig(e) {
-        e.preventDefault();
-        const data = {
-            anio: document.getElementById('conf-anio').value,
-            prefijo_comprobante: document.getElementById('conf-prefijo').value.trim().toUpperCase() || 'NAS',
-            cuota_admon: document.getElementById('conf-cuota').value,
-            tasa_mora_mensual: document.getElementById('conf-tasa').value,
-            dia_generacion_cuota: document.getElementById('conf-gen').value,
-            dia_vencimiento_sin_mora: document.getElementById('conf-venc').value,
-            dia_inicio_mora: document.getElementById('conf-mora').value,
-            mostrar_copia: document.getElementById('conf-copia').value === 'true'
-        };
+async saveConfig(e) {
+         e.preventDefault();
+         const cuotaExtra = parseFloat(document.getElementById('conf-cuotaextra').value) || 0;
+         const showExtra = cuotaExtra > 0;
+         const data = {
+             anio: document.getElementById('conf-anio').value,
+             prefijo_comprobante: document.getElementById('conf-prefijo').value.trim().toUpperCase() || 'NAS',
+             cuota_admon: document.getElementById('conf-cuota').value,
+             cuota_extra: showExtra ? cuotaExtra : 0,
+             cuota_extra_mes_inicio: showExtra ? parseInt(document.getElementById('conf-cemes').value) || 0 : 0,
+             cuota_extra_anio_inicio: showExtra ? parseInt(document.getElementById('conf-ceanio').value) || 0 : 0,
+             cuota_extra_duracion: showExtra ? parseInt(document.getElementById('conf-cedur').value) || 0 : 0,
+             tasa_mora_mensual: document.getElementById('conf-tasa').value,
+             dia_generacion_cuota: document.getElementById('conf-gen').value,
+             dia_vencimiento_sin_mora: document.getElementById('conf-venc').value,
+             dia_inicio_mora: document.getElementById('conf-mora').value,
+             mostrar_copia: document.getElementById('conf-copia').value === 'true'
+         };
         try {
             window.NassauApp.showLoading(true);
             await window.NassauAPI.apiPost('/parametros', data);
@@ -157,22 +175,28 @@ window.NassauConfiguracion = {
         const nuevo = Math.max(0, val + delta);
         input.value = nuevo;
     },
-    async actualizarConfig(id, btn) {
-        const data = {
-            tasa_mora_mensual: parseFloat(document.getElementById(`tasa-${id}`).value) || 0,
-            dia_generacion_cuota: parseInt(document.getElementById(`gen-${id}`).value) || 1,
-            dia_vencimiento_sin_mora: parseInt(document.getElementById(`venc-${id}`).value) || 1,
-            dia_inicio_mora: parseInt(document.getElementById(`mora-${id}`).value) || 1
-        };
-        try {
-            window.NassauApp.showLoading(true);
-            await window.NassauAPI.apiPut(`/parametros/${id}`, data);
-            window.NassauApp.showToast('Configuración actualizada', 'success');
-            btn.style.display = 'none';
-            this.loadConfig();
-        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); } 
-        finally { window.NassauApp.showLoading(false); }
-    },
+async actualizarConfig(id, btn) {
+         const cuotaExtra = parseFloat(document.getElementById(`cuotaextra-${id}`).value) || 0;
+         const showExtra = cuotaExtra > 0;
+         const data = {
+             tasa_mora_mensual: parseFloat(document.getElementById(`tasa-${id}`).value) || 0,
+             dia_generacion_cuota: parseInt(document.getElementById(`gen-${id}`).value) || 1,
+             dia_vencimiento_sin_mora: parseInt(document.getElementById(`venc-${id}`).value) || 1,
+             dia_inicio_mora: parseInt(document.getElementById(`mora-${id}`).value) || 1,
+             cuota_extra: showExtra ? cuotaExtra : 0,
+             cuota_extra_mes_inicio: showExtra ? parseInt(document.getElementById(`cemes-${id}`).value) || 0 : 0,
+             cuota_extra_anio_inicio: showExtra ? parseInt(document.getElementById(`ceanio-${id}`).value) || 0 : 0,
+             cuota_extra_duracion: showExtra ? parseInt(document.getElementById(`cedur-${id}`).value) || 0 : 0
+         };
+         try {
+             window.NassauApp.showLoading(true);
+             await window.NassauAPI.apiPut(`/parametros/${id}`, data);
+             window.NassauApp.showToast('Configuración actualizada', 'success');
+             btn.style.display = 'none';
+             this.loadConfig();
+         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+         finally { window.NassauApp.showLoading(false); }
+     },
     async generarConsecutivo(id, prefijo) {
         const input = document.getElementById(`consec-${id}`);
         if (!input) return;

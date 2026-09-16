@@ -51,6 +51,10 @@ CREATE TABLE parametros_anio (
     cuota_admon              DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     mostrar_copia            BOOLEAN NOT NULL DEFAULT TRUE,
     retroactivo_admon        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    cuota_extra              DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    cuota_extra_mes_inicio   INTEGER NOT NULL DEFAULT 0,
+    cuota_extra_anio_inicio  INTEGER NOT NULL DEFAULT 0,
+    cuota_extra_duracion     INTEGER NOT NULL DEFAULT 0,
     created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(urbanizacion_id, anio)
 );
@@ -202,6 +206,10 @@ DECLARE
     v_mes_anterior  INT;
     v_anio_anterior INT;
     v_count         INTEGER := 0;
+    v_cuota_extra   DECIMAL(12,2) := 0;
+    v_inicio_mes_idx INTEGER := 0;
+    v_mes_actual_idx INTEGER := 0;
+    v_fin_mes_idx   INTEGER := 0;
 BEGIN
     SELECT * INTO v_params FROM parametros_anio
     WHERE urbanizacion_id = p_urbanizacion_id AND anio = p_anio;
@@ -233,13 +241,24 @@ BEGIN
 
         IF v_saldo_ant IS NULL THEN v_saldo_ant := 0; END IF;
 
+        -- Calcular cuota_extra aplicable
+        v_cuota_extra := 0;
+        IF v_params.cuota_extra > 0 THEN
+            v_inicio_mes_idx := (v_params.cuota_extra_anio_inicio - 1) * 12 + v_params.cuota_extra_mes_inicio;
+            v_mes_actual_idx := (p_anio - 1) * 12 + p_mes;
+            v_fin_mes_idx := v_inicio_mes_idx + v_params.cuota_extra_duracion - 1;
+            IF v_mes_actual_idx >= v_inicio_mes_idx AND v_mes_actual_idx <= v_fin_mes_idx THEN
+                v_cuota_extra := v_params.cuota_extra;
+            END IF;
+        END IF;
+
         INSERT INTO estados_cuenta (
             propietario_id, anio, mes, pago_actual,
             saldo_anterior, saldo_favor, intereses, fecha_vencimiento
         )
         VALUES (
             v_prop.id, p_anio, p_mes,
-            CASE WHEN v_params.cuota_admon > 0 THEN v_params.cuota_admon ELSE v_prop.cuota_admon END,
+            (CASE WHEN v_params.cuota_admon > 0 THEN v_params.cuota_admon ELSE v_prop.cuota_admon END) + v_cuota_extra,
             v_saldo_ant, 0, 0, v_fecha_vcto
         )
         ON CONFLICT (propietario_id, anio, mes) DO NOTHING;
