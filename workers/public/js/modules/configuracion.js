@@ -99,25 +99,52 @@ const params = await window.NassauAPI.apiGet('/parametros');
         finally { window.NassauApp.showLoading(false); }
     },
 async showConfigModal() {
-         let cuotaExtraVal = 0, cuotaExtraMes = 1, cuotaExtraAnio = new Date().getFullYear() + 1, cuotaExtraDur = 0;
+         const targetAnio = new Date().getFullYear() + 1;
+         let cuotaExtraVal = 0, cuotaExtraMes = 1, cuotaExtraAnio = targetAnio, cuotaExtraDur = 0;
          try {
-const allParams = await window.NassauAPI.apiGet('/parametros');
-               const cy = new Date().getFullYear();
-               const prev = allParams.find(p => Number(p.anio) === cy && (Number(p.cuota_extra) || 0) > 0);
-               if (prev) {
-                  const mi = Number(prev.cuota_extra_mes_inicio) || 1;
-                  const dur = Number(prev.cuota_extra_duracion) || 0;
-                  const monthsInPrevYear = Math.max(0, 12 - mi + 1);
-                  const remaining = Math.max(0, dur - monthsInPrevYear);
-                  console.log('carry-over: monthsInPrevYear=', monthsInPrevYear, 'remaining=', remaining);
-                  if (remaining > 0) {
-                      cuotaExtraVal = Number(prev.cuota_extra);
-                      cuotaExtraMes = 1;
-                      cuotaExtraAnio = cy + 1;
-                      cuotaExtraDur = remaining;
-                  }
-              }
-         } catch(e) { console.error('Cuota extra carry-over:', e); }
+              const allParams = await window.NassauAPI.apiGet('/parametros');
+               // buscar cuota extra vigente que se extienda al targetAnio
+               const withExtra = allParams.filter(p => (Number(p.cuota_extra) || 0) > 0 && (Number(p.cuota_extra_duracion) || 0) > 0).sort((a,b) => Number(b.anio) - Number(a.anio));
+               for (const p of withExtra) {
+                   const mi = Number(p.cuota_extra_mes_inicio) || 1;
+                   const ai = Number(p.cuota_extra_anio_inicio) || Number(p.anio);
+                   const dur = Number(p.cuota_extra_duracion) || 0;
+                   if (mi < 1 || mi > 12 || !ai || !dur) continue;
+                   const startIdx = ai * 12 + (mi - 1);
+                   const endIdx = startIdx + dur - 1;
+                   const targetStartIdx = targetAnio * 12;
+                   const targetEndIdx = targetAnio * 12 + 11;
+                   if (endIdx >= targetStartIdx && startIdx <= targetEndIdx) {
+                       const overlapStart = Math.max(startIdx, targetStartIdx);
+                       const overlapEnd = Math.min(endIdx, targetEndIdx);
+                       const remaining = overlapEnd - overlapStart + 1;
+                       if (remaining > 0) {
+                           cuotaExtraVal = Number(p.cuota_extra);
+                           cuotaExtraMes = overlapStart === targetStartIdx ? 1 : (overlapStart % 12) + 1;
+                           cuotaExtraAnio = targetAnio;
+                           cuotaExtraDur = remaining;
+                           break;
+                       }
+                   }
+               }
+               // fallback simple: último año con cuota_extra si no tiene anio_inicio
+               if (!cuotaExtraVal) {
+                   const cy = new Date().getFullYear();
+                   const prev = allParams.find(p => Number(p.anio) === cy && (Number(p.cuota_extra) || 0) > 0);
+                   if (prev) {
+                       const mi = Number(prev.cuota_extra_mes_inicio) || 1;
+                       const dur = Number(prev.cuota_extra_duracion) || 0;
+                       const monthsInPrevYear = Math.max(0, 12 - mi + 1);
+                       const remaining = Math.max(0, dur - monthsInPrevYear);
+                       if (remaining > 0) {
+                           cuotaExtraVal = Number(prev.cuota_extra);
+                           cuotaExtraMes = 1;
+                           cuotaExtraAnio = targetAnio;
+                           cuotaExtraDur = remaining;
+                       }
+                   }
+               }
+         } catch(e) {}
 
 const html = `
               <h2 style="text-align:left;margin-bottom:15px;">PARAMETROS NUEVO AÑO</h2>
@@ -162,6 +189,14 @@ async saveConfig(e) {
          e.preventDefault();
          const cuotaExtra = parseFloat(document.getElementById('conf-cuotaextra').value) || 0;
          const showExtra = cuotaExtra > 0;
+         if (showExtra) {
+             const mes = parseInt(document.getElementById('conf-cemes').value);
+             const anioI = parseInt(document.getElementById('conf-ceanio').value);
+             const dur = parseInt(document.getElementById('conf-cedur').value);
+             if (!mes || mes < 1 || mes > 12) { window.NassauApp.showToast('Mes inicio cuota extra debe ser 1-12', 'error'); return; }
+             if (!anioI || anioI < 2020 || anioI > 2100) { window.NassauApp.showToast('Año inicio cuota extra inválido', 'error'); return; }
+             if (!dur || dur < 1 || dur > 60) { window.NassauApp.showToast('Duración cuota extra debe ser 1-60 meses', 'error'); return; }
+         }
          const data = {
              anio: document.getElementById('conf-anio').value,
              prefijo_comprobante: document.getElementById('conf-prefijo').value.trim().toUpperCase() || 'NAS',
