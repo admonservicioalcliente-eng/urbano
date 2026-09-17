@@ -155,10 +155,11 @@ if (res instanceof Response) return res;
        } else if (path.startsWith('/api/pdf/') && method === 'GET') {
          res = await tempPdfHandler.handleGet(request, env, user);
 } else if (path.startsWith('/api/parametros')) {
-        if (method === 'GET') res = await parametrosHandler.handleGet(request, env, user);
-        else if (method === 'POST') res = await parametrosHandler.handleCreate(request, env, user);
-        else if (method === 'PUT' && resourceId) res = await parametrosHandler.handleUpdate(request, env, user, resourceId);
-      } else if (path === '/api/cuotas/generar' && method === 'POST') {
+         if (method === 'GET') res = await parametrosHandler.handleGet(request, env, user);
+         else if (method === 'POST') res = await parametrosHandler.handleCreate(request, env, user);
+         else if (method === 'PUT' && resourceId) res = await parametrosHandler.handleUpdate(request, env, user, resourceId);
+         else if (method === 'DELETE' && resourceId) res = await parametrosHandler.handleDelete(request, env, user, resourceId);
+       } else if (path === '/api/cuotas/generar' && method === 'POST') {
         res = await parametrosHandler.handleGenerarCuotas(request, env, user);
       } else if (path.startsWith('/api/urbanizaciones')) {
         if (method === 'GET') res = await superadminHandler.handleGetUrbanizaciones(request, env, user);

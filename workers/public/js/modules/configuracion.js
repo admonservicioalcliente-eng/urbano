@@ -150,6 +150,7 @@ const html = `
                      </select>
                  </div>
                  <div class="form-actions">
+                     <button type="button" class="btn-danger" onclick="window.NassauApp.configModule.deleteConfig()">Eliminar Año</button>
                      <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
                      <button type="submit" class="btn-primary">Guardar</button>
                  </div>
@@ -180,10 +181,22 @@ async saveConfig(e) {
             window.NassauApp.showToast('Configuración guardada', 'success');
             window.NassauApp.closeModal();
             this.loadConfig();
-        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); } 
-        finally { window.NassauApp.showLoading(false); }
-    },
-    async generarCuotas() {
+} catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+         finally { window.NassauApp.showLoading(false); }
+     },
+     async deleteConfig() {
+         const anio = document.getElementById('conf-anio').value;
+         if (!confirm(`¿Eliminar la configuración del año ${anio}?`)) return;
+         try {
+             window.NassauApp.showLoading(true);
+             await window.NassauAPI.apiDelete(`/parametros/${anio}`);
+             window.NassauApp.showToast(`Año ${anio} eliminado`, 'success');
+             this.loadConfig();
+             window.NassauApp.closeModal();
+         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+         finally { window.NassauApp.showLoading(false); }
+     },
+     async generarCuotas() {
         if(!confirm('¿Generar cuotas para el mes actual? Esto afectará los estados de cuenta.')) return;
         try {
             window.NassauApp.showLoading(true);

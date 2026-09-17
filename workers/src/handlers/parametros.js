@@ -172,5 +172,19 @@ export async function handleGenerarCuotas(request, env, user) {
   }
 }
 
+export async function handleDelete(request, env, user, anio) {
+  let row;
+  try {
+    row = await query(env, `SELECT anio FROM parametros_anio WHERE urbanizacion_id = $1 AND anio = $2`, [user.urbanizacion_id, parseInt(anio)]);
+  } catch(e) { return err(500, e.message); }
+  if (!row.length) return err(404, 'Registro no encontrado');
+  try {
+    await query(env, `DELETE FROM parametros_anio WHERE urbanizacion_id = $1 AND anio = $2`, [user.urbanizacion_id, parseInt(anio)]);
+    return ok({ message: `Año ${anio} eliminado` });
+  } catch(e) {
+    return err(500, e.message);
+  }
+}
+
 const ok = (data, status = 200) => Response.json({ ok: true, data }, { status });
 const err = (status, message) => Response.json({ ok: false, message }, { status });
