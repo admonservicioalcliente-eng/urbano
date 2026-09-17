@@ -220,7 +220,7 @@ async actualizarConfig(id, btn) {
              window.NassauApp.showToast('Configuración actualizada', 'success');
              btn.style.display = 'none';
              this.loadConfig();
-         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+} catch(e) { console.error('saveConfig error:', e.message, e); window.NassauApp.showToast('Error: ' + e.message, 'error'); }
          finally { window.NassauApp.showLoading(false); }
      },
     async generarConsecutivo(id, prefijo) {
