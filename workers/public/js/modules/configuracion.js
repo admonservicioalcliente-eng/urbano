@@ -102,14 +102,16 @@ async showConfigModal() {
          try {
              const allParams = await window.NassauAPI.apiGet('/parametros');
              const cy = new Date().getFullYear();
-const prev = allParams.find(p => p.anio === cy - 1 && (p.cuota_extra || 0) > 0);
+const prev = allParams.find(p => p.anio === cy - 1 && (Number(p.cuota_extra) || 0) > 0);
+              console.log('carry-over: prev found:', !!prev, 'cuota_extra:', prev?.cuota_extra, 'mes_inicio:', prev?.cuota_extra_mes_inicio, 'dur:', prev?.cuota_extra_duracion);
               if (prev) {
-                  const mi = prev.cuota_extra_mes_inicio || 1;
-                  const dur = prev.cuota_extra_duracion || 0;
+                  const mi = Number(prev.cuota_extra_mes_inicio) || 1;
+                  const dur = Number(prev.cuota_extra_duracion) || 0;
                   const monthsInPrevYear = Math.max(0, 12 - mi + 1);
                   const remaining = Math.max(0, dur - monthsInPrevYear);
+                  console.log('carry-over: monthsInPrevYear=', monthsInPrevYear, 'remaining=', remaining);
                   if (remaining > 0) {
-                      cuotaExtraVal = prev.cuota_extra;
+                      cuotaExtraVal = Number(prev.cuota_extra);
                       cuotaExtraMes = 1;
                       cuotaExtraAnio = cy + 1;
                       cuotaExtraDur = remaining;
@@ -118,7 +120,6 @@ const prev = allParams.find(p => p.anio === cy - 1 && (p.cuota_extra || 0) > 0);
          } catch(e) { console.error('Cuota extra carry-over:', e); }
 
 const html = `
-              <div style="text-align:center;margin-bottom:15px;"><h2>Cuota / Cuota Extra</h2></div>
               <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
                  <div class="form-row">
                      <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear() + 1}"></div>
