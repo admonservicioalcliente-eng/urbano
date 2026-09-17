@@ -8,7 +8,7 @@ export async function handleGet(request, env, user) {
   if (user.rol === 'superadmin' && override) urbId = override;
 
 // Asegurar que las columnas cuota_extra existan
-  const cols = await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio'`);
+  const cols = await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio' AND table_schema = 'public'`);
   const colNames = cols.map(c => c.column_name);
   if (!colNames.includes('cuota_extra')) {
     await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra DECIMAL(12,2) DEFAULT 0`);
@@ -24,7 +24,10 @@ export async function handleGet(request, env, user) {
   }
   console.log('handleGet columns:', colNames);
 
-  const rows = await query(env,
+  let rows;
+  try {
+    cols; // verify columns query ran
+    rows = await query(env,
      `SELECT id, urbanizacion_id, anio, tasa_mora_mensual, dia_generacion_cuota,
              dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, mostrar_copia,
              cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion, retroactivo_admon
@@ -33,8 +36,24 @@ export async function handleGet(request, env, user) {
       ORDER BY anio DESC`,
      [urbId]
    );
-   console.log('handleGet rows:', rows.length, 'cuota_extra:', rows[0]?.cuota_extra);
-   return ok(rows);
+  } catch(e) {
+    console.error('handleGet SELECT error:', e.message, 'creating columns...');
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+    rows = await query(env,
+     `SELECT id, urbanizacion_id, anio, tasa_mora_mensual, dia_generacion_cuota,
+             dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, mostrar_copia,
+             cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion, retroactivo_admon
+      FROM parametros_anio
+      WHERE urbanizacion_id = $1
+      ORDER BY anio DESC`,
+     [urbId]
+    );
+  }
+  console.log('handleGet rows:', rows.length, 'cuota_extra:', rows[0]?.cuota_extra, 'colNames:', colNames);
+  return ok(rows);
 }
 
 export async function handleCreate(request, env, user) {
