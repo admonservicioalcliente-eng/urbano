@@ -57,16 +57,22 @@ export async function handleGet(request, env, user) {
 export async function handleCreate(request, env, user) {
   console.log('HANDLE_CREATE called');
   // Asegurar que las columnas cuota_extra existan
-  try { await query(env, `SELECT cuota_extra FROM parametros_anio LIMIT 0`); } catch(e) {
+  let colOk = false;
+  try { await query(env, `SELECT cuota_extra FROM parametros_anio LIMIT 0`); colOk = true; } catch(e) {
+    console.error('cuota_extra columns missing, creating...');
     await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
     await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
     await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
     await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+    colOk = true;
   }
+  console.log('CREATE: colOk=', colOk);
 
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
   console.log('BODY:', JSON.stringify(body));
+  console.log('CREATE columns check done');
+  console.log('CREATE columns check done, cuota_extra:', cuota_extra);
 
   const { anio, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, consecutivo_comprobante, mostrar_copia, cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion } = body;
   if (!anio || tasa_mora_mensual === undefined) {
