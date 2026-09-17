@@ -12,7 +12,7 @@ window.NassauConfiguracion = {
             </div>
             <div class="card table-container">
                 <table class="premium-table config-table" id="config-table">
-                    <thead><tr><th>Año</th><th>Cuota</th><th>Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th></tr></thead>
+                    <thead><tr><th>Año</th><th>Cuota</th><th>Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th><th>Acción</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -24,8 +24,8 @@ async loadConfig() {
              window.NassauApp.showLoading(true);
 const params = await window.NassauAPI.apiGet('/parametros');
              const tbody = document.querySelector('#config-table tbody');
-             if(params.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center">No hay parámetros configurados</td></tr>';
+              if(params.length === 0) {
+                 tbody.innerHTML = '<tr><td colspan="12" class="text-center">No hay parámetros configurados</td></tr>';
                 return;
             }
             tbody.innerHTML = params.map(p => {
@@ -82,6 +82,7 @@ const params = await window.NassauAPI.apiGet('/parametros');
                             <span class="toggle-slider"></span>
                         </label>
                     </td>
+                    <td><button class="btn-danger btn-sm" onclick="window.NassauConfiguracion.eliminarAnio(${p.anio})" title="Eliminar ${p.anio}">🗑 Eliminar</button></td>
                 </tr>`;
             }).join('');
             tbody.querySelectorAll('.config-field').forEach(field => {
@@ -149,11 +150,11 @@ const html = `
                          <option value="false">No (Solo Original)</option>
                      </select>
                  </div>
-                 <div class="form-actions">
-                     <button type="button" class="btn-danger" onclick="window.NassauApp.configModule.deleteConfig()">Eliminar Año</button>
-                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
-                     <button type="submit" class="btn-primary">Guardar</button>
-                 </div>
+                  <div class="form-actions">
+                      <button type="button" class="btn-danger" onclick="window.NassauConfiguracion.deleteConfig()">Eliminar Año</button>
+                      <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>
+                      <button type="submit" class="btn-primary">Guardar</button>
+                  </div>
              </form>`;
          window.NassauApp.showModal('', html);
      },
@@ -184,15 +185,25 @@ async saveConfig(e) {
 } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
          finally { window.NassauApp.showLoading(false); }
      },
-     async deleteConfig() {
+      async deleteConfig() {
          const anio = document.getElementById('conf-anio').value;
          if (!confirm(`¿Eliminar la configuración del año ${anio}?`)) return;
          try {
              window.NassauApp.showLoading(true);
              await window.NassauAPI.apiDelete(`/parametros/${anio}`);
              window.NassauApp.showToast(`Año ${anio} eliminado`, 'success');
-             this.loadConfig();
              window.NassauApp.closeModal();
+             this.loadConfig();
+         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
+         finally { window.NassauApp.showLoading(false); }
+     },
+     async eliminarAnio(anio) {
+         if (!confirm(`¿Eliminar la configuración del año ${anio}? Esta acción no se puede deshacer.`)) return;
+         try {
+             window.NassauApp.showLoading(true);
+             await window.NassauAPI.apiDelete(`/parametros/${anio}`);
+             window.NassauApp.showToast(`Año ${anio} eliminado`, 'success');
+             this.loadConfig();
          } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
          finally { window.NassauApp.showLoading(false); }
      },
@@ -213,9 +224,11 @@ async saveConfig(e) {
         input.value = nuevo;
     },
 async actualizarConfig(id, btn) {
+         const cuotaAdmon = parseFloat(document.getElementById(`cuota-${id}`)?.value);
          const cuotaExtra = parseFloat(document.getElementById(`cuotaextra-${id}`).value) || 0;
          const showExtra = cuotaExtra > 0;
          const data = {
+             cuota_admon: isNaN(cuotaAdmon) ? undefined : cuotaAdmon,
              tasa_mora_mensual: parseFloat(document.getElementById(`tasa-${id}`).value) || 0,
              dia_generacion_cuota: parseInt(document.getElementById(`gen-${id}`).value) || 1,
              dia_vencimiento_sin_mora: parseInt(document.getElementById(`venc-${id}`).value) || 1,
@@ -268,10 +281,19 @@ async actualizarConfig(id, btn) {
             window.NassauApp.showToast('Ingrese un valor válido', 'error');
             return;
         }
-        if (!confirm(`¿Modificar cuota a $${nuevaCuota.toLocaleString()}?\n\nSi el valor es mayor al anterior, se generará un cobro retroactivo (Ley 675) por la diferencia en los meses ya cerrados.`)) return;
+        const cuotaExtra = parseFloat(document.getElementById(`cuotaextra-${id}`)?.value) || 0;
+        const showExtra = cuotaExtra > 0;
+        if (!confirm(`¿Modificar cuota a $${nuevaCuota.toLocaleString()}${showExtra ? ` + extra $${cuotaExtra.toLocaleString()} (${document.getElementById(`cedur-${id}`)?.value || 0} meses)` : ''}?\n\nSi el valor es mayor al anterior, se generará un cobro retroactivo (Ley 675) por la diferencia en los meses ya cerrados.`)) return;
         try {
             window.NassauApp.showLoading(true);
-            const result = await window.NassauAPI.apiPut(`/parametros/${id}`, { cuota_admon: nuevaCuota });
+            const data = {
+                cuota_admon: nuevaCuota,
+                cuota_extra: showExtra ? cuotaExtra : 0,
+                cuota_extra_mes_inicio: showExtra ? parseInt(document.getElementById(`cemes-${id}`)?.value) || 0 : 0,
+                cuota_extra_anio_inicio: showExtra ? parseInt(document.getElementById(`ceanio-${id}`)?.value) || 0 : 0,
+                cuota_extra_duracion: showExtra ? parseInt(document.getElementById(`cedur-${id}`)?.value) || 0 : 0
+            };
+            await window.NassauAPI.apiPut(`/parametros/${id}`, data);
             window.NassauApp.showToast('Cuota modificada exitosamente', 'success');
             this.loadConfig();
         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
