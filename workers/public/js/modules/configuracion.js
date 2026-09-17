@@ -98,7 +98,7 @@ window.NassauConfiguracion = {
         finally { window.NassauApp.showLoading(false); }
     },
 async showConfigModal() {
-         let cuotaExtraVal = 0, cuotaExtraMes = 1, cuotaExtraAnio = new Date().getFullYear(), cuotaExtraDur = 0;
+         let cuotaExtraVal = 0, cuotaExtraMes = 1, cuotaExtraAnio = new Date().getFullYear() + 1, cuotaExtraDur = 0;
          try {
              const allParams = await window.NassauAPI.apiGet('/parametros');
              const cy = new Date().getFullYear();
@@ -114,16 +114,17 @@ async showConfigModal() {
 if (remaining > 0) {
                      cuotaExtraVal = prevRecord.cuota_extra;
                      cuotaExtraMes = prevRecord.cuota_extra_mes_inicio || 1;
-                     cuotaExtraAnio = cy;
+                     cuotaExtraAnio = cy + 1;
                      cuotaExtraDur = remaining;
                  }
              }
          } catch(e) { console.error('Cuota extra carry-over:', e); }
 
-         const html = `
-             <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
+const html = `
+              <div style="text-align:center;margin-bottom:15px;"><h2>Cuota / Cuota Extra</h2></div>
+              <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
                  <div class="form-row">
-                     <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear()}"></div>
+                     <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear() + 1}"></div>
                      <div class="form-group"><label>Prefijo Comprobante</label><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
                  </div>
                  <div class="form-row">
@@ -155,7 +156,7 @@ if (remaining > 0) {
                      <button type="submit" class="btn-primary">Guardar</button>
                  </div>
              </form>`;
-         window.NassauApp.showModal('Configurar Parámetros', html);
+         window.NassauApp.showModal('Cuota/Cuota Extra', html);
      },
 async saveConfig(e) {
          e.preventDefault();
