@@ -19,12 +19,13 @@ window.NassauConfiguracion = {
         document.getElementById('page-config').innerHTML = html;
         await this.loadConfig();
     },
-    async loadConfig() {
-        try {
-            window.NassauApp.showLoading(true);
-            const params = await window.NassauAPI.apiGet('/parametros');
-            const tbody = document.querySelector('#config-table tbody');
-            if(params.length === 0) {
+async loadConfig() {
+         try {
+             window.NassauApp.showLoading(true);
+             const params = await window.NassauAPI.apiGet('/parametros');
+             console.log('loadConfig params:', params);
+             const tbody = document.querySelector('#config-table tbody');
+             if(params.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" class="text-center">No hay parámetros configurados</td></tr>';
                 return;
             }
@@ -120,6 +121,7 @@ const prev = allParams.find(p => p.anio === cy - 1 && (Number(p.cuota_extra) || 
          } catch(e) { console.error('Cuota extra carry-over:', e); }
 
 const html = `
+              <h2 style="text-align:left;margin-bottom:15px;">Cuota/Cuota Extra</h2>
               <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
                  <div class="form-row">
                      <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear() + 1}"></div>
@@ -154,7 +156,7 @@ const html = `
                      <button type="submit" class="btn-primary">Guardar</button>
                  </div>
              </form>`;
-         window.NassauApp.showModal('Cuota/Cuota Extra', html);
+         window.NassauApp.showModal('', html);
      },
 async saveConfig(e) {
          e.preventDefault();

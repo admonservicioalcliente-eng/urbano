@@ -7,13 +7,14 @@ export async function handleGet(request, env, user) {
   const override = url.searchParams.get('urbanizacion_id');
   if (user.rol === 'superadmin' && override) urbId = override;
 
-  const rows = await query(env,
-    `SELECT * FROM parametros_anio
-     WHERE urbanizacion_id = $1
-     ORDER BY anio DESC`,
-    [urbId]
-  );
-  return ok(rows);
+const rows = await query(env,
+     `SELECT * FROM parametros_anio
+      WHERE urbanizacion_id = $1
+      ORDER BY anio DESC`,
+     [urbId]
+   );
+   console.log('handleGet rows:', rows.length, 'cuota_extra values:', rows.map(r => r.cuota_extra));
+   return ok(rows);
 }
 
 export async function handleCreate(request, env, user) {
