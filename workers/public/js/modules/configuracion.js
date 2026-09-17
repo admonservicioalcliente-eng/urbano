@@ -22,8 +22,8 @@ window.NassauConfiguracion = {
 async loadConfig() {
          try {
              window.NassauApp.showLoading(true);
-             const params = await window.NassauAPI.apiGet('/parametros');
-             console.log('loadConfig params:', params);
+const params = await window.NassauAPI.apiGet('/parametros');
+              console.log('loadConfig params:', params, 'cuota_extra:', params[0]?.cuota_extra, 'mes:', params[0]?.cuota_extra_mes_inicio);
              const tbody = document.querySelector('#config-table tbody');
              if(params.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" class="text-center">No hay parámetros configurados</td></tr>';
