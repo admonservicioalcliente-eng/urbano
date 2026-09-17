@@ -7,13 +7,33 @@ export async function handleGet(request, env, user) {
   const override = url.searchParams.get('urbanizacion_id');
   if (user.rol === 'superadmin' && override) urbId = override;
 
-const rows = await query(env,
-     `SELECT * FROM parametros_anio
+// Asegurar que las columnas cuota_extra existan
+  const cols = await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio'`);
+  const colNames = cols.map(c => c.column_name);
+  if (!colNames.includes('cuota_extra')) {
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra DECIMAL(12,2) DEFAULT 0`);
+  }
+  if (!colNames.includes('cuota_extra_mes_inicio')) {
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_mes_inicio INTEGER DEFAULT 0`);
+  }
+  if (!colNames.includes('cuota_extra_anio_inicio')) {
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_anio_inicio INTEGER DEFAULT 0`);
+  }
+  if (!colNames.includes('cuota_extra_duracion')) {
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_duracion INTEGER DEFAULT 0`);
+  }
+  console.log('handleGet columns:', colNames);
+
+  const rows = await query(env,
+     `SELECT id, urbanizacion_id, anio, tasa_mora_mensual, dia_generacion_cuota,
+             dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, mostrar_copia,
+             cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion, retroactivo_admon
+      FROM parametros_anio
       WHERE urbanizacion_id = $1
       ORDER BY anio DESC`,
      [urbId]
    );
-   console.log('handleGet rows:', rows.length, 'first row keys:', rows[0] ? Object.keys(rows[0]) : 'empty', 'cuota_extra:', rows[0]?.cuota_extra);
+   console.log('handleGet rows:', rows.length, 'cuota_extra:', rows[0]?.cuota_extra);
    return ok(rows);
 }
 
