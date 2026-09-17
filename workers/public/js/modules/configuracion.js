@@ -12,7 +12,7 @@ window.NassauConfiguracion = {
             </div>
             <div class="card table-container">
                 <table class="premium-table config-table" id="config-table">
-                    <thead><tr><th>Año</th><th>Cuota</th><th>Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th><th>Acción</th></tr></thead>
+                    <thead><tr><th>Año</th><th>Cuota / Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th><th>Acción</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -25,7 +25,7 @@ async loadConfig() {
 const params = await window.NassauAPI.apiGet('/parametros');
              const tbody = document.querySelector('#config-table tbody');
               if(params.length === 0) {
-                 tbody.innerHTML = '<tr><td colspan="12" class="text-center">No hay parámetros configurados</td></tr>';
+                 tbody.innerHTML = '<tr><td colspan="11" class="text-center">No hay parámetros configurados</td></tr>';
                 return;
             }
             tbody.innerHTML = params.map(p => {
@@ -120,7 +120,7 @@ const allParams = await window.NassauAPI.apiGet('/parametros');
          } catch(e) { console.error('Cuota extra carry-over:', e); }
 
 const html = `
-              <h2 style="text-align:left;margin-bottom:15px;">Cuota/Cuota Extra</h2>
+              <h2 style="text-align:left;margin-bottom:15px;">PARAMETROS NUEVO AÑO</h2>
               <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
                  <div class="form-row">
                      <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear() + 1}"></div>
