@@ -23,7 +23,6 @@ async loadConfig() {
          try {
              window.NassauApp.showLoading(true);
 const params = await window.NassauAPI.apiGet('/parametros');
-              console.log('loadConfig params:', params, 'cuota_extra:', params[0]?.cuota_extra, 'mes:', params[0]?.cuota_extra_mes_inicio);
              const tbody = document.querySelector('#config-table tbody');
              if(params.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" class="text-center">No hay parámetros configurados</td></tr>';
@@ -102,10 +101,8 @@ async showConfigModal() {
          let cuotaExtraVal = 0, cuotaExtraMes = 1, cuotaExtraAnio = new Date().getFullYear() + 1, cuotaExtraDur = 0;
          try {
 const allParams = await window.NassauAPI.apiGet('/parametros');
-              const cy = new Date().getFullYear();
-              console.log('showConfigModal: allParams:', allParams.map(p => ({anio: p.anio, type: typeof p.anio, cuota_extra: p.cuota_extra, cuota_extra_type: typeof p.cuota_extra})), 'cy:', cy);
-              const prev = allParams.find(p => { const match = Number(p.anio) === cy && (Number(p.cuota_extra) || 0) > 0; console.log('  checking anio:', p.anio, 'match:', match, 'cuota_extra:', p.cuota_extra, '>0:', (Number(p.cuota_extra) || 0) > 0); return match; });
-              console.log('carry-over: prev found:', !!prev, 'cuota_extra:', prev?.cuota_extra, 'mes_inicio:', prev?.cuota_extra_mes_inicio, 'dur:', prev?.cuota_extra_duracion);
+               const cy = new Date().getFullYear();
+               const prev = allParams.find(p => Number(p.anio) === cy && (Number(p.cuota_extra) || 0) > 0);
                if (prev) {
                   const mi = Number(prev.cuota_extra_mes_inicio) || 1;
                   const dur = Number(prev.cuota_extra_duracion) || 0;
