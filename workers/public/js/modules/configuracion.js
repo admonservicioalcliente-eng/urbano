@@ -102,22 +102,19 @@ async showConfigModal() {
          try {
              const allParams = await window.NassauAPI.apiGet('/parametros');
              const cy = new Date().getFullYear();
-             const prev = allParams.find(p => p.anio === cy - 1 && (p.cuota_extra || 0) > 0);
-             if (prev) {
-                 const mi = prev.cuota_extra_mes_inicio || 1;
-                 const dur = prev.cuota_extra_duracion || 0;
-                 const ay = prev.cuota_extra_anio_inicio || (cy - 1);
-                 const startMonth = ay * 12 + mi;
-                 const nowMonth = new Date().getFullYear() * 12 + new Date().getMonth() + 1;
-                 const applied = Math.max(0, nowMonth - startMonth + 1);
-                 const remaining = Math.max(0, dur - applied);
-if (remaining > 0) {
-                     cuotaExtraVal = prevRecord.cuota_extra;
-                     cuotaExtraMes = prevRecord.cuota_extra_mes_inicio || 1;
-                     cuotaExtraAnio = cy + 1;
-                     cuotaExtraDur = remaining;
-                 }
-             }
+const prev = allParams.find(p => p.anio === cy - 1 && (p.cuota_extra || 0) > 0);
+              if (prev) {
+                  const mi = prev.cuota_extra_mes_inicio || 1;
+                  const dur = prev.cuota_extra_duracion || 0;
+                  const monthsInPrevYear = Math.max(0, 12 - mi + 1);
+                  const remaining = Math.max(0, dur - monthsInPrevYear);
+                  if (remaining > 0) {
+                      cuotaExtraVal = prev.cuota_extra;
+                      cuotaExtraMes = 1;
+                      cuotaExtraAnio = cy + 1;
+                      cuotaExtraDur = remaining;
+                  }
+              }
          } catch(e) { console.error('Cuota extra carry-over:', e); }
 
 const html = `
