@@ -7,20 +7,18 @@ export async function handleGet(request, env, user) {
   const override = url.searchParams.get('urbanizacion_id');
   if (user.rol === 'superadmin' && override) urbId = override;
 
-// Asegurar que las columnas cuota_extra existan
-  const cols = await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio' AND table_schema = 'public'`);
-  const colNames = cols.map(c => c.column_name);
-  if (!colNames.includes('cuota_extra')) {
-    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra DECIMAL(12,2) DEFAULT 0`);
-  }
-  if (!colNames.includes('cuota_extra_mes_inicio')) {
-    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_mes_inicio INTEGER DEFAULT 0`);
-  }
-  if (!colNames.includes('cuota_extra_anio_inicio')) {
-    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_anio_inicio INTEGER DEFAULT 0`);
-  }
-  if (!colNames.includes('cuota_extra_duracion')) {
-    await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_duracion INTEGER DEFAULT 0`);
+// Asegurar que las columnas cuota_extra existan — intentar SELECT para verificar
+  let colNames = [];
+  try {
+    const sample = await query(env, `SELECT cuota_extra FROM parametros_anio LIMIT 0`);
+    colNames = ['cuota_extra'];
+  } catch(e) {
+    console.error('cuota_extra column missing, creating...');
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+    colNames = ['cuota_extra', 'cuota_extra_mes_inicio', 'cuota_extra_anio_inicio', 'cuota_extra_duracion'];
   }
   console.log('handleGet columns:', colNames);
 
@@ -59,11 +57,12 @@ export async function handleGet(request, env, user) {
 export async function handleCreate(request, env, user) {
   console.log('HANDLE_CREATE called');
   // Asegurar que las columnas cuota_extra existan
-  const colNames = (await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio' AND table_schema = 'public'`)).map(c => c.column_name);
-  if (!colNames.includes('cuota_extra')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra DECIMAL(12,2) DEFAULT 0`);
-  if (!colNames.includes('cuota_extra_mes_inicio')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_mes_inicio INTEGER DEFAULT 0`);
-  if (!colNames.includes('cuota_extra_anio_inicio')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_anio_inicio INTEGER DEFAULT 0`);
-  if (!colNames.includes('cuota_extra_duracion')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_duracion INTEGER DEFAULT 0`);
+  try { await query(env, `SELECT cuota_extra FROM parametros_anio LIMIT 0`); } catch(e) {
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+  }
 
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
@@ -123,11 +122,12 @@ export async function handleCreate(request, env, user) {
 export async function handleUpdate(request, env, user, id) {
   console.log('HANDLE_UPDATE called, id:', id);
   // Asegurar que las columnas cuota_extra existan
-  const colNames = (await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio' AND table_schema = 'public'`)).map(c => c.column_name);
-  if (!colNames.includes('cuota_extra')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra DECIMAL(12,2) DEFAULT 0`);
-  if (!colNames.includes('cuota_extra_mes_inicio')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_mes_inicio INTEGER DEFAULT 0`);
-  if (!colNames.includes('cuota_extra_anio_inicio')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_anio_inicio INTEGER DEFAULT 0`);
-  if (!colNames.includes('cuota_extra_duracion')) await query(env, `ALTER TABLE parametros_anio ADD COLUMN cuota_extra_duracion INTEGER DEFAULT 0`);
+  try { await query(env, `SELECT cuota_extra FROM parametros_anio LIMIT 0`); } catch(e) {
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
+    await query(env, `ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+  }
 
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
