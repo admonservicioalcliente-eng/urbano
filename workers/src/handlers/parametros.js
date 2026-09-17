@@ -72,7 +72,6 @@ export async function handleCreate(request, env, user) {
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
   console.log('BODY:', JSON.stringify(body));
   console.log('CREATE columns check done');
-  console.log('CREATE columns check done, cuota_extra:', cuota_extra);
 
   const { anio, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, consecutivo_comprobante, mostrar_copia, cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion } = body;
   if (!anio || tasa_mora_mensual === undefined) {
