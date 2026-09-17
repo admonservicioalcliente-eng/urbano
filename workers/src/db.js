@@ -45,11 +45,12 @@ export async function ensureMigrations(env) {
        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS mostrar_copia BOOLEAN DEFAULT TRUE`);
        // Campo retroactivo_admon en parametros_anio (Ley 675)
        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS retroactivo_admon DECIMAL(12,2) DEFAULT 0`);
-       // Campos cuota_extra
-       await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
-       await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
-       await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
-       await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+// Campos cuota_extra
+        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
+        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
+        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
+        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+        console.log('Migration: cuota_extra columns added');
         // Activar urbanizaciones existentes que ya estaban admitidas
         await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
 

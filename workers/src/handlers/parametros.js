@@ -13,7 +13,7 @@ const rows = await query(env,
       ORDER BY anio DESC`,
      [urbId]
    );
-   console.log('handleGet rows:', rows.length, 'cuota_extra values:', rows.map(r => r.cuota_extra));
+   console.log('handleGet rows:', rows.length, 'first row keys:', rows[0] ? Object.keys(rows[0]) : 'empty', 'cuota_extra:', rows[0]?.cuota_extra);
    return ok(rows);
 }
 
