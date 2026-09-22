@@ -81,11 +81,12 @@ window.NassauEstados = {
                     const deudaMes = Number(e.total_deuda || 0);
                     const badge = e.cerrado ? 'activo' : (deudaMes > 0 ? 'moroso' : 'inactivo');
                     const estadoLabel = e.cerrado ? 'Cerrado' : (deudaMes > 0 ? 'Pendiente' : 'Al d\u00eda');
-                    const hasDesglose = e.valor_apto != null || e.valor_celda != null || e.valor_cuarto_util != null;
+                    const sumDesglose = (Number(e.valor_apto)||0)+(Number(e.valor_celda)||0)+(Number(e.valor_cuarto_util)||0);
+                    const hasDesglose = sumDesglose > 0;
                     const vApto = hasDesglose ? (Number(e.valor_apto)||0) : Number(e.pago_actual)||0;
                     const vCelda = hasDesglose ? (Number(e.valor_celda)||0) : 0;
                     const vCuarto = hasDesglose ? (Number(e.valor_cuarto_util)||0) : 0;
-                    const totalCuota = hasDesglose ? (vApto+vCelda+vCuarto || Number(e.pago_actual)||0) : Number(e.pago_actual)||0;
+                    const totalCuota = hasDesglose ? (vApto+vCelda+vCuarto) : Number(e.pago_actual)||0;
                     if (!e.cerrado) { sumApto+=vApto; sumCelda+=vCelda; sumCuarto+=vCuarto; sumCuota+=totalCuota; }
                     return `
                     <tr>

@@ -9,8 +9,7 @@ export async function handleGetByPropietario(request, env, user) {
 
   if (!propId) return err(400, 'ID de propietario requerido');
 
-  // Validar pertenencia
-  const propRows = await query(env, `SELECT urbanizacion_id, estado, cuota_admon FROM propietarios WHERE id = $1`, [propId]);
+  const propRows = await query(env, `SELECT urbanizacion_id, estado, cuota_admon, cuota_total, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util FROM propietarios WHERE id = $1`, [propId]);
   if (!propRows.length) return err(404, 'Propietario no encontrado');
   if (user.rol !== 'superadmin' && propRows[0].urbanizacion_id !== user.urbanizacion_id) {
     return err(403, 'Acceso denegado');
@@ -46,14 +45,18 @@ export async function handleGetByPropietario(request, env, user) {
         [propRows[0].urbanizacion_id, anioActual]
       );
       const presupuesto = params.length ? parseFloat(params[0].cuota_admon) : 0;
-      let cuota;
+      let cuota, vApto=0, vCelda=0, vCuarto=0;
       const sumCoef = (parseFloat(pf.coef_apto)||0) + (pf.has_celda ? parseFloat(pf.coef_celda)||0 :0) + (pf.has_cuarto_util ? parseFloat(pf.coef_cuarto_util)||0 :0);
       if (presupuesto>0 && sumCoef>0) {
         const vc = pf.has_celda ? parseFloat(pf.valor_celda)||0 :0;
         const vq = pf.has_cuarto_util ? parseFloat(pf.valor_cuarto_util)||0 :0;
         cuota = Math.round((presupuesto * sumCoef/100 + vc + vq)*100)/100;
+        vApto = Math.round(presupuesto * (parseFloat(pf.coef_apto)||0)/100*100)/100;
+        vCelda = pf.has_celda ? Math.round((presupuesto * (parseFloat(pf.coef_celda)||0)/100 + vc)*100)/100 : 0;
+        vCuarto = pf.has_cuarto_util ? Math.round((presupuesto * (parseFloat(pf.coef_cuarto_util)||0)/100 + vq)*100)/100 : 0;
       } else {
-        cuota = (presupuesto>0 ? presupuesto : (parseFloat(propRows[0].cuota_admon)||0));
+        cuota = parseFloat(pf.cuota_total) || parseFloat(pf.cuota_admon) || parseFloat(propRows[0].cuota_total) || parseFloat(propRows[0].cuota_admon) || 0;
+        vApto = cuota; vCelda=0; vCuarto=0;
       }
 
       virtualMesActual = true;
@@ -63,6 +66,7 @@ export async function handleGetByPropietario(request, env, user) {
         anio: anioActual,
         mes: mesActual,
         pago_actual: cuota,
+        valor_apto: vApto, valor_celda: vCelda, valor_cuarto_util: vCuarto,
         saldo_anterior: 0,
         saldo_favor: 0,
         intereses: 0,
