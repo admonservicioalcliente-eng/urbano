@@ -124,9 +124,9 @@ export async function ensureMigrations(env) {
                      v_fin_mes_idx:=v_inicio_mes_idx+v_params.cuota_extra_duracion-1;
                      IF v_mes_actual_idx >= v_inicio_mes_idx AND v_mes_actual_idx <= v_fin_mes_idx THEN v_cuota_extra:=v_params.cuota_extra; END IF;
                  END IF;
-                 v_presupuesto:=COALESCE(v_params.cuota_admon,0);
-                 v_sum_coef:=COALESCE(v_prop.coef_apto,0) + CASE WHEN COALESCE(v_prop.has_celda,false) THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
-                  IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
+                  v_presupuesto:=COALESCE(v_params.cuota_admon,0);
+                  v_sum_coef:=COALESCE(v_prop.coef_apto,0) + CASE WHEN COALESCE(v_prop.has_celda,false) THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
+                   IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
                       v_vapto:=ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2);
                       v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100 + COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
                       v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100 + COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
@@ -135,13 +135,15 @@ export async function ensureMigrations(env) {
                        v_total_cuota:=COALESCE(v_prop.cuota_total, v_prop.cuota_admon, 0);
                        v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
                    END IF;
-                 BEGIN
-                     INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
-                     VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_saldo_ant, 0, 0, v_fecha_vcto) ON CONFLICT (propietario_id, anio, mes) DO NOTHING;
-                 EXCEPTION WHEN undefined_column THEN
-                     INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
-                     VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_saldo_ant, 0, 0, v_fecha_vcto) ON CONFLICT (propietario_id, anio, mes) DO NOTHING;
-                 END;
+                  BEGIN
+                      INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+                      VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_saldo_ant, 0, 0, v_fecha_vcto)
+                      ON CONFLICT (propietario_id, anio, mes) DO UPDATE SET pago_actual = EXCLUDED.pago_actual, valor_apto = EXCLUDED.valor_apto, valor_celda = EXCLUDED.valor_celda, valor_cuarto_util = EXCLUDED.valor_cuarto_util;
+                  EXCEPTION WHEN undefined_column THEN
+                      INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+                      VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_saldo_ant, 0, 0, v_fecha_vcto)
+                      ON CONFLICT (propietario_id, anio, mes) DO UPDATE SET pago_actual = EXCLUDED.pago_actual;
+                  END;
                  v_count:=v_count+1;
              END LOOP;
              RETURN v_count;
