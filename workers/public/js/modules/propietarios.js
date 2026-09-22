@@ -30,8 +30,8 @@ window.NassauPropietarios = {
         const tbody = document.querySelector('#props-table tbody');
         if (!tbody) return;
         tbody.innerHTML = data.map(p => {
-            const manual = Number(p.cuota_admon) || 0;
-            const total = Number(p.cuota_total) || manual || 0;
+            const manual = p.cuota_admon != null && p.cuota_admon !== '' ? Number(p.cuota_admon) : 0;
+            const total = p.cuota_total != null && p.cuota_total !== '' ? Number(p.cuota_total) : manual;
             return `<tr><td>${p.apartamento}</td><td>${p.prefijo || '-'}</td><td>${p.no_celda || '-'}</td><td>${p.nombre_propietario}</td><td>$${manual.toLocaleString()}</td><td><b>$${total.toLocaleString()}</b></td><td>${p.modo_pago}</td><td><select data-id="${p.id}" data-orig="${p.estado}" class="search-input prop-estado-select" style="padding:0.2rem 0.4rem;"><option value="activo" ${p.estado === 'activo' ? 'selected' : ''}>Activo</option><option value="moroso" ${p.estado === 'moroso' ? 'selected' : ''}>Moroso</option><option value="abono_inicial" ${p.estado === 'abono_inicial' ? 'selected' : ''}>Abono Inicial</option><option value="inactivo" ${p.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option></select><button class="btn-primary btn-sm prop-estado-update" data-id="${p.id}" style="display:none;">Actualizar</button></td><td>${p.ultimo_comprobante || '-'}</td><td><button class="btn-secondary btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.showEditModal(this.dataset.id)">Editar</button><button class="btn-danger btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.deletePropietario(this.dataset.id)">Eliminar</button></td></tr>`;
         }).join('');
         tbody.querySelectorAll('.prop-estado-select').forEach(sel => {
@@ -156,13 +156,13 @@ window.NassauPropietarios = {
         const hasCelda = !!(p.has_celda || p.no_celda);
         const hasCuarto = !!p.has_cuarto_util;
         const hasApto = !!(parseFloat(p.coef_apto) > 0);
-        const coefApto = p.coef_apto || '';
-        const coefCelda = p.coef_celda || '';
-        const coefCuarto = p.coef_cuarto_util || '';
-        const valCelda = p.valor_celda || '';
-        const valCuarto = p.valor_cuarto_util || '';
-        const cuotaManual = p.cuota_admon || p.cuota_total || '';
-        const cuotaTotal = p.cuota_total || '';
+        const coefApto = p.coef_apto ?? '';
+        const coefCelda = p.coef_celda ?? '';
+        const coefCuarto = p.coef_cuarto_util ?? '';
+        const valCelda = p.valor_celda ?? '';
+        const valCuarto = p.valor_cuarto_util ?? '';
+        const cuotaManual = p.cuota_admon != null && p.cuota_admon !== '' ? p.cuota_admon : '';
+        const cuotaTotal = p.cuota_total != null && p.cuota_total !== '' ? p.cuota_total : '';
         return `
             <form id="prop-form" onsubmit="window.NassauPropietarios.savePropietario(event)">
                 <div class="form-group"><label>Nombre Completo</label><input type="text" id="prop-nombre" value="${p.nombre_propietario || ''}" required></div>

@@ -218,7 +218,7 @@ export async function handleUpdate(request, env, user, id) {
       has_cuarto_util = COALESCE($22, has_cuarto_util),
       updated_at = NOW()
     WHERE id = $23 RETURNING *`,
-    [nombre_propietario || null, apartamento || null, no_celda || null, cuotaManualUpd === undefined ? null : parseFloat(cuotaManualUpd) || null, cuotaTotalUpd === undefined ? null : parseFloat(cuotaTotalUpd) || null, estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
+    [nombre_propietario || null, apartamento || null, no_celda || null, cuotaManualUpd === undefined ? null : (isNaN(parseFloat(cuotaManualUpd)) ? 0 : parseFloat(cuotaManualUpd)), cuotaTotalUpd === undefined ? null : (isNaN(parseFloat(cuotaTotalUpd)) ? 0 : parseFloat(cuotaTotalUpd)), estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
      coef_apto === undefined ? null : parseFloat(coef_apto) || 0,
      coef_celda === undefined ? null : parseFloat(coef_celda) || 0,
      coef_cuarto_util === undefined ? null : parseFloat(coef_cuarto_util) || 0,
