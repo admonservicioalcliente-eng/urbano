@@ -49,8 +49,20 @@ export async function ensureMigrations(env) {
         await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra DECIMAL(12,2) DEFAULT 0`);
         await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_mes_inicio INTEGER DEFAULT 0`);
         await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
-        await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
-        console.log('Migration: cuota_extra columns added');
+         await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
+         console.log('Migration: cuota_extra columns added');
+         // Propietarios: coeficientes y valores por inmueble (apto/celda/cuarto)
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_apto DECIMAL(10,4) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_celda DECIMAL(10,4) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_cuarto_util DECIMAL(10,4) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
+         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
+         // Estados de cuenta: desglose por item
+         await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+         await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
         // Activar urbanizaciones existentes que ya estaban admitidas
         await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
 

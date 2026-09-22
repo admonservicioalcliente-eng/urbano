@@ -12,7 +12,7 @@ window.NassauConfiguracion = {
             </div>
             <div class="card table-container">
                 <table class="premium-table config-table" id="config-table">
-                    <thead><tr><th>Año</th><th>Cuota / Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th><th>Acción</th></tr></thead>
+                    <thead><tr><th>Año</th><th>Valor Cuota Presupuesto / Cuota Extra</th><th>Prefijo</th><th>Consecutivo</th><th>Próx.</th><th>Tasa Mora (%)</th><th>Día Gen.</th><th>Día Venc.</th><th>Día Mora</th><th>Copia PDF</th><th>Acción</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -153,10 +153,10 @@ const html = `
                      <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear() + 1}"></div>
                      <div class="form-group"><label>Prefijo Comprobante</label><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
                  </div>
-                 <div class="form-row">
-                      <div class="form-group"><label>Cuota Admín. Mensual ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
-                      <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
-                  </div>
+                  <div class="form-row">
+                       <div class="form-group"><label>Valor Cuota Presupuesto ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
+                       <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
+                   </div>
                   <div class="form-row" id="conf-cuota-extra-fields" style="display:${cuotaExtraVal > 0 ? '' : 'none'};">
                       <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="${cuotaExtraMes}"></div>
                       <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${cuotaExtraAnio}"></div>

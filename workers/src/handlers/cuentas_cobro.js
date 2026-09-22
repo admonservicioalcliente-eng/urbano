@@ -56,20 +56,39 @@ export async function handleCreate(request, env, user) {
   const { propietario_id } = body;
   if (!propietario_id) return err(400, 'ID del propietario requerido');
 
-  // Validar pertenencia
-  const propRows = await query(env, `SELECT urbanizacion_id, nombre_propietario, apartamento, cuota_admon, abono_inicial, created_at FROM propietarios WHERE id = $1`, [propietario_id]);
+  const propRows = await query(env, `SELECT * FROM propietarios WHERE id = $1`, [propietario_id]);
   if (!propRows.length) return err(404, 'Propietario no encontrado');
    const prop = propRows[0];
    if (user.rol !== 'superadmin' && prop.urbanizacion_id !== user.urbanizacion_id) {
      return err(403, 'Acceso denegado');
    }
 
+// calcular desglose cuota por coeficientes
+  let presupuestoCC = 0;
+  try {
+    const prCC = await query(env, `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id=$1 AND anio=EXTRACT(YEAR FROM NOW())`, [prop.urbanizacion_id]);
+    presupuestoCC = prCC.length ? parseFloat(prCC[0].cuota_admon) : 0;
+  } catch {}
+  const coefA = parseFloat(prop.coef_apto)||0, coefC = prop.has_celda ? parseFloat(prop.coef_celda)||0 :0, coefQ = prop.has_cuarto_util ? parseFloat(prop.coef_cuarto_util)||0:0;
+  const vcFixed = prop.has_celda ? parseFloat(prop.valor_celda)||0 :0;
+  const vqFixed = prop.has_cuarto_util ? parseFloat(prop.valor_cuarto_util)||0 :0;
+  let vAptoCC=0, vCeldaCC=0, vCuartoCC=0;
+  if (presupuestoCC>0 && (coefA+coefC+coefQ)>0) {
+    vAptoCC = Math.round(presupuestoCC * coefA /100 *100)/100;
+    vCeldaCC = prop.has_celda ? Math.round((presupuestoCC * coefC /100 + vcFixed)*100)/100 :0;
+    vCuartoCC = prop.has_cuarto_util ? Math.round((presupuestoCC * coefQ /100 + vqFixed)*100)/100 :0;
+  }
+
    const propContacto = {
      nombre: prop.nombre_propietario,
      apartamento: prop.apartamento,
      cuota_admon: prop.cuota_admon,
      email: prop.email || '',
-     telefono: prop.telefono || ''
+     telefono: prop.telefono || '',
+     coef_apto: prop.coef_apto, coef_celda: prop.coef_celda, coef_cuarto_util: prop.coef_cuarto_util,
+     valor_celda: prop.valor_celda, valor_cuarto_util: prop.valor_cuarto_util,
+     has_celda: prop.has_celda, has_cuarto_util: prop.has_cuarto_util,
+     desglose: { valor_apto: vAptoCC, valor_celda: vCeldaCC, valor_cuarto_util: vCuartoCC, presupuesto: presupuestoCC }
    };
 
   // ¿Es la primera cuenta de cobro del propietario? Si es nueva y tiene abono
@@ -115,10 +134,7 @@ export async function handleCreate(request, env, user) {
   await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
   // YA NO se vuelve a reconciliar, para no alterar cerrado
 
-  // Traer TODOS los estados (abiertos y cerrados) para el cuerpo de la CC:
-  // el primer mes del propietario (mes de inicio) queda cerrado cuando el
-  // abono inicial cubre la cuota, pero debe seguir apareciendo como ítem.
-  let ecs = await query(env,
+    let ecs = await query(env,
     `SELECT * FROM estados_cuenta
      WHERE propietario_id = $1
      ORDER BY anio ASC, mes ASC`,
@@ -223,11 +239,11 @@ const detalleJson = {
       banco_titular: urb.banco_titular,
       banco_celular: urb.banco_celular
     },
-    propietario: propContacto,
+     propietario: propContacto,
+    desglose_cuota: propContacto.desglose,
     periodos_pendientes: ecs.map(e => {
       const base = parseFloat(e.pago_actual) + parseFloat(e.saldo_anterior) + parseFloat(e.intereses);
       const favor = parseFloat(e.saldo_favor) || 0;
-      // saldo_favor siempre refleja el monto aplicado al mes (después de la reconciliación)
       const montoAplicado = favor;
       const pagado = montoAplicado;
       const saldo = Math.max(0, base - montoAplicado);
@@ -236,6 +252,7 @@ const detalleJson = {
         anio: e.anio,
         mes: e.mes,
         pago_actual: e.pago_actual,
+        valor_apto: e.valor_apto, valor_celda: e.valor_celda, valor_cuarto_util: e.valor_cuarto_util,
         saldo_anterior: e.saldo_anterior,
         intereses: e.intereses,
         saldo_favor: e.saldo_favor,

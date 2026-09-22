@@ -312,6 +312,18 @@ window.NassauDocumentos = {
             doc.line(M, b + 30, RIGHT, b + 30);
 
             // Cabecera de conceptos
+            // Desglose cuota por inmueble si existe
+            const desglose = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
+            if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util)) {
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(80,80,80);
+                let desTxt = `Desglose cuota: Apto $${Number(desglose.valor_apto||0).toLocaleString()}`;
+                if (desglose.valor_celda) desTxt += ` | Celda $${Number(desglose.valor_celda).toLocaleString()}`;
+                if (desglose.valor_cuarto_util) desTxt += ` | Cuarto $${Number(desglose.valor_cuarto_util).toLocaleString()}`;
+                if (desglose.presupuesto) desTxt += ` (Presupuesto $${Number(desglose.presupuesto).toLocaleString()})`;
+                doc.text(desTxt, M, b + 33.5);
+                doc.setTextColor(0,0,0);
+            }
+
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
             doc.text('CONCEPTO', M, b + 34.5); doc.text('VALOR', RIGHT - 12, b + 34.5, { align: 'right' });
             doc.line(M, b + 36.5, RIGHT, b + 36.5);
