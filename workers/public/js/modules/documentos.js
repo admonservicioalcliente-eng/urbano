@@ -357,23 +357,31 @@ window.NassauDocumentos = {
                 }
             });
 
+            // fallback header desglose para cuentas antiguas sin valor_apto en periodos
+            const desgloseHeader = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
             todasLasCuotas.forEach(r => {
                 if (y > b + 80) return;
                 doc.setFont('helvetica', 'normal');
                 doc.text(r.label, M, y);
                 doc.text(`$${Math.abs(r.value).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4.3;
-                if (r.valor_apto != null || r.valor_celda != null || r.valor_cuarto_util != null) {
-                    const hasDes = (Number(r.valor_apto)||0) || (Number(r.valor_celda)||0) || (Number(r.valor_cuarto_util)||0);
-                    if (hasDes && y <= b + 80) {
-                        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(60,60,60);
-                        let sub = `  Apto $${Number(r.valor_apto||0).toLocaleString()}`;
-                        if (Number(r.valor_celda)) sub += ` | Celda $${Number(r.valor_celda).toLocaleString()}`;
-                        if (Number(r.valor_cuarto_util)) sub += ` | Cuarto $${Number(r.valor_cuarto_util).toLocaleString()}`;
-                        doc.text(sub, M, y);
-                        doc.setFontSize(8.5); doc.setTextColor(0,0,0);
-                        y += 3.5;
-                    }
+                let va = Number(r.valor_apto||0), vc = Number(r.valor_celda||0), vq = Number(r.valor_cuarto_util||0);
+                let hasDes = va || vc || vq;
+                if (!hasDes && desgloseHeader && (desgloseHeader.valor_apto||desgloseHeader.valor_celda||desgloseHeader.valor_cuarto_util)) {
+                    // usar desglose del propietario para cuentas antiguas
+                    va = Number(desgloseHeader.valor_apto||0);
+                    vc = Number(desgloseHeader.valor_celda||0);
+                    vq = Number(desgloseHeader.valor_cuarto_util||0);
+                    hasDes = va||vc||vq;
+                }
+                if (hasDes && y <= b + 80) {
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(60,60,60);
+                    let sub = `  Apto $${va.toLocaleString()}`;
+                    if (vc) sub += ` | Celda $${vc.toLocaleString()}`;
+                    if (vq) sub += ` | Cuarto $${vq.toLocaleString()}`;
+                    doc.text(sub, M, y);
+                    doc.setFontSize(8.5); doc.setTextColor(0,0,0);
+                    y += 3.5;
                 }
             });
 
