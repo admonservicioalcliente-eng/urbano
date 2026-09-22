@@ -315,14 +315,15 @@ window.NassauDocumentos = {
             try {
             const desglose = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
             if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util)) {
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(80,80,80);
-                let desTxt = `Desglose cuota: Apto $${Number(desglose.valor_apto||0).toLocaleString()}`;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0,0,0);
+                let desTxt = `Desglose cuota mensual: Apto $${Number(desglose.valor_apto||0).toLocaleString()}`;
                 if (desglose.valor_celda) desTxt += ` | Celda $${Number(desglose.valor_celda).toLocaleString()}`;
                 if (desglose.valor_cuarto_util) desTxt += ` | Cuarto $${Number(desglose.valor_cuarto_util).toLocaleString()}`;
                 if (desglose.presupuesto) desTxt += ` (Presupuesto $${Number(desglose.presupuesto).toLocaleString()})`;
                 const maxW = RIGHT - M;
-                if (doc.getTextWidth(desTxt) > maxW) desTxt = desTxt.substring(0, 90) + '...';
-                doc.text(desTxt, M, b + 32.8);
+                if (doc.getTextWidth(desTxt) > maxW) desTxt = desTxt.substring(0, 95) + '...';
+                doc.setFillColor(255,255,200); doc.rect(M, b + 30.5, RIGHT-M, 5, 'F');
+                doc.text(desTxt, M+1, b + 33.8);
                 doc.setTextColor(0,0,0);
             }
             } catch(e) { console.warn('desglose draw failed', e); }
@@ -336,7 +337,6 @@ window.NassauDocumentos = {
 
             const rows = [];
 
-            // Todas las cuotas de administración (pagadas y pendientes)
             const todasLasCuotas = [];
             (detalle?.periodos_pendientes || []).forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
@@ -351,7 +351,8 @@ window.NassauDocumentos = {
                         estado: estado,
                         total_deuda: cuotaMes,
                         pagado: p.pagado || 0,
-                        pendiente: p.pendiente || cuotaMes
+                        pendiente: p.pendiente || cuotaMes,
+                        valor_apto: p.valor_apto, valor_celda: p.valor_celda, valor_cuarto_util: p.valor_cuarto_util
                     });
                 }
             });
@@ -362,6 +363,18 @@ window.NassauDocumentos = {
                 doc.text(r.label, M, y);
                 doc.text(`$${Math.abs(r.value).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4.3;
+                if (r.valor_apto != null || r.valor_celda != null || r.valor_cuarto_util != null) {
+                    const hasDes = (Number(r.valor_apto)||0) || (Number(r.valor_celda)||0) || (Number(r.valor_cuarto_util)||0);
+                    if (hasDes && y <= b + 80) {
+                        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(60,60,60);
+                        let sub = `  Apto $${Number(r.valor_apto||0).toLocaleString()}`;
+                        if (Number(r.valor_celda)) sub += ` | Celda $${Number(r.valor_celda).toLocaleString()}`;
+                        if (Number(r.valor_cuarto_util)) sub += ` | Cuarto $${Number(r.valor_cuarto_util).toLocaleString()}`;
+                        doc.text(sub, M, y);
+                        doc.setFontSize(8.5); doc.setTextColor(0,0,0);
+                        y += 3.5;
+                    }
+                }
             });
 
             // Cuotas extras
