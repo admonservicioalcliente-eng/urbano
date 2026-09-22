@@ -65,6 +65,30 @@ export async function ensureMigrations(env) {
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+          // Corregir estados existentes que tenían presupuesto como pago_actual (234000) -> usar cuota del propietario
+          await sql.unsafe(`
+            UPDATE estados_cuenta ec SET
+              pago_actual = COALESCE(p.cuota_total, p.cuota_admon, ec.pago_actual),
+              valor_apto = COALESCE(p.cuota_total, p.cuota_admon, ec.pago_actual),
+              valor_celda = 0,
+              valor_cuarto_util = 0
+            FROM propietarios p
+            WHERE ec.propietario_id = p.id
+              AND (p.coef_apto IS NULL OR p.coef_apto = 0) AND COALESCE(p.has_celda,false)=false AND COALESCE(p.has_cuarto_util,false)=false
+              AND ec.cerrado = false
+          `);
+          await sql.unsafe(`
+            UPDATE estados_cuenta ec SET
+              pago_actual = ROUND(pa.cuota_admon * (COALESCE(p.coef_apto,0) + CASE WHEN COALESCE(p.has_celda,false) THEN COALESCE(p.coef_celda,0) ELSE 0 END + CASE WHEN COALESCE(p.has_cuarto_util,false) THEN COALESCE(p.coef_cuarto_util,0) ELSE 0 END)/100 + CASE WHEN COALESCE(p.has_celda,false) THEN COALESCE(p.valor_celda,0) ELSE 0 END + CASE WHEN COALESCE(p.has_cuarto_util,false) THEN COALESCE(p.valor_cuarto_util,0) ELSE 0 END, 2),
+              valor_apto = ROUND(pa.cuota_admon * COALESCE(p.coef_apto,0)/100, 2),
+              valor_celda = CASE WHEN COALESCE(p.has_celda,false) THEN ROUND(pa.cuota_admon * COALESCE(p.coef_celda,0)/100 + COALESCE(p.valor_celda,0),2) ELSE 0 END,
+              valor_cuarto_util = CASE WHEN COALESCE(p.has_cuarto_util,false) THEN ROUND(pa.cuota_admon * COALESCE(p.coef_cuarto_util,0)/100 + COALESCE(p.valor_cuarto_util,0),2) ELSE 0 END
+            FROM propietarios p
+            JOIN parametros_anio pa ON pa.urbanizacion_id = p.urbanizacion_id AND pa.anio = ec.anio
+            WHERE ec.propietario_id = p.id
+              AND (COALESCE(p.coef_apto,0) > 0 OR COALESCE(p.has_celda,false) OR COALESCE(p.has_cuarto_util,false))
+              AND ec.cerrado = false
+          `);
          // Función generar_cuotas_mes con fórmula de coeficientes
          await sql.unsafe(`
          CREATE OR REPLACE FUNCTION generar_cuotas_mes(p_urbanizacion_id UUID, p_anio INT, p_mes INT)
