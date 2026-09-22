@@ -22,9 +22,10 @@ window.NassauEstados = {
                         <button class="btn-primary" onclick="window.NassauEstados.generarCuentaCobro()">Generar Cuenta de Cobro</button>
                     </div>
                     <table class="premium-table" id="estados-table">
-                        <thead><tr><th>Mes</th><th>Cuota</th><th>Saldo Anterior</th><th>Días Mora</th><th>Intereses</th><th>Pagado</th><th>Total Deuda</th><th>Estado</th></tr></thead>
+                        <thead><tr><th>Mes</th><th>Apto</th><th>Celda</th><th>Cuarto Útil</th><th>Cuota Total</th><th>Saldo Anterior</th><th>Días Mora</th><th>Intereses</th><th>Pagado</th><th>Total Deuda</th><th>Estado</th></tr></thead>
                         <tbody></tbody>
                     </table>
+                    <div id="estado-desglose-resumen" style="margin-top:10px; font-size:0.85rem; color:var(--text-secondary);"></div>
                 </div>
             </div>`;
         document.getElementById('page-estados').innerHTML = html;
@@ -71,17 +72,28 @@ window.NassauEstados = {
             const t = (!Array.isArray(resp) && resp?.totales) ? resp.totales : null;
             const tbody = document.querySelector('#estados-table tbody');
             if(!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center">No hay registros para este a\u00f1o</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center">No hay registros para este a\u00f1o</td></tr>';
+                document.getElementById('estado-desglose-resumen').innerHTML = '';
             } else {
                 const mesNames = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+                let sumApto=0, sumCelda=0, sumCuarto=0, sumCuota=0;
                 tbody.innerHTML = data.map(e => {
                     const deudaMes = Number(e.total_deuda || 0);
                     const badge = e.cerrado ? 'activo' : (deudaMes > 0 ? 'moroso' : 'inactivo');
                     const estadoLabel = e.cerrado ? 'Cerrado' : (deudaMes > 0 ? 'Pendiente' : 'Al d\u00eda');
+                    const hasDesglose = e.valor_apto != null || e.valor_celda != null || e.valor_cuarto_util != null;
+                    const vApto = hasDesglose ? (Number(e.valor_apto)||0) : Number(e.pago_actual)||0;
+                    const vCelda = hasDesglose ? (Number(e.valor_celda)||0) : 0;
+                    const vCuarto = hasDesglose ? (Number(e.valor_cuarto_util)||0) : 0;
+                    const totalCuota = hasDesglose ? (vApto+vCelda+vCuarto || Number(e.pago_actual)||0) : Number(e.pago_actual)||0;
+                    if (!e.cerrado) { sumApto+=vApto; sumCelda+=vCelda; sumCuarto+=vCuarto; sumCuota+=totalCuota; }
                     return `
                     <tr>
                         <td>${mesNames[e.mes] || e.mes}</td>
-                        <td>$${Number(e.pago_actual).toLocaleString()}</td>
+                        <td>$${vApto.toLocaleString()}</td>
+                        <td>${vCelda?`$${vCelda.toLocaleString()}`:'—'}</td>
+                        <td>${vCuarto?`$${vCuarto.toLocaleString()}`:'—'}</td>
+                        <td><b>$${totalCuota.toLocaleString()}</b></td>
                         <td>$${Number(e.saldo_anterior).toLocaleString()}</td>
                         <td>${e.dias_mora || 0}</td>
                         <td>$${Number(e.intereses).toLocaleString()}</td>
@@ -90,6 +102,15 @@ window.NassauEstados = {
                         <td><span class="badge badge-${badge}">${estadoLabel}</span></td>
                     </tr>`;
                 }).join('');
+                // resumen en una sola línea si debe varios meses
+                const pendientes = data.filter(e=>!e.cerrado && Number(e.total_deuda)>0);
+                if (pendientes.length > 1) {
+                    document.getElementById('estado-desglose-resumen').innerHTML = `<b>Resumen ${pendientes.length} meses pendientes:</b> Apto $${sumApto.toLocaleString()} | Celda $${sumCelda.toLocaleString()} | Cuarto $${sumCuarto.toLocaleString()} | <b>Total cuotas $${sumCuota.toLocaleString()}</b>`;
+                } else if (pendientes.length === 1) {
+                    document.getElementById('estado-desglose-resumen').innerHTML = `<b>Desglose mes pendiente:</b> Apto $${sumApto.toLocaleString()}${sumCelda?` | Celda $${sumCelda.toLocaleString()}`:''}${sumCuarto?` | Cuarto $${sumCuarto.toLocaleString()}`:''}`;
+                } else {
+                    document.getElementById('estado-desglose-resumen').innerHTML = '';
+                }
             }
             // Totales reales del propietario (todos los meses + abonos del mes
             // actual aplicados a la deuda más antigua)
