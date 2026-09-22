@@ -102,15 +102,15 @@ export async function ensureMigrations(env) {
                  END IF;
                  v_presupuesto:=COALESCE(v_params.cuota_admon,0);
                  v_sum_coef:=COALESCE(v_prop.coef_apto,0) + CASE WHEN COALESCE(v_prop.has_celda,false) THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
-                 IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
-                     v_vapto:=ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2);
-                     v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100 + COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
-                     v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100 + COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
-                     v_total_cuota:=ROUND(v_presupuesto * v_sum_coef/100 + COALESCE(v_prop.valor_celda,0)*CASE WHEN COALESCE(v_prop.has_celda,false) THEN 1 ELSE 0 END + COALESCE(v_prop.valor_cuarto_util,0)*CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN 1 ELSE 0 END,2);
-                  ELSE
-                      v_total_cuota:=COALESCE(v_prop.cuota_total, CASE WHEN v_presupuesto>0 THEN v_presupuesto ELSE COALESCE(v_prop.cuota_admon,0) END, 0);
-                      v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
-                  END IF;
+                  IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
+                      v_vapto:=ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2);
+                      v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100 + COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
+                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100 + COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
+                      v_total_cuota:=ROUND(v_presupuesto * v_sum_coef/100 + COALESCE(v_prop.valor_celda,0)*CASE WHEN COALESCE(v_prop.has_celda,false) THEN 1 ELSE 0 END + COALESCE(v_prop.valor_cuarto_util,0)*CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN 1 ELSE 0 END,2);
+                   ELSE
+                       v_total_cuota:=COALESCE(v_prop.cuota_total, v_prop.cuota_admon, 0);
+                       v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
+                   END IF;
                  BEGIN
                      INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
                      VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_saldo_ant, 0, 0, v_fecha_vcto) ON CONFLICT (propietario_id, anio, mes) DO NOTHING;

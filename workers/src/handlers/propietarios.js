@@ -295,7 +295,7 @@ async function sembrarEstadosInicio(env, prop) {
       // se guardará desglose abajo en insert si columnas existen
       prop._desglose = { vApto: Math.round(vApto*100)/100, vCelda: Math.round(vCelda*100)/100, vCuarto: Math.round(vCuarto*100)/100 };
     } else {
-      cuota = parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || (presupuestoAnio !== null ? presupuestoAnio : 0) || 0;
+      cuota = parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || 0;
       prop._desglose = { vApto: cuota, vCelda: 0, vCuarto: 0 };
     }
 
