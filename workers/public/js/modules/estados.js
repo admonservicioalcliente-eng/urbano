@@ -110,7 +110,10 @@ window.NassauEstados = {
             window.NassauApp.showLoading(true);
             const doc = await window.NassauAPI.apiPost('/cuentas-cobro', { propietario_id: propId });
             window.NassauApp.showToast('Cuenta de cobro generada!', 'success');
-            if(window.NassauDocumentos) window.NassauDocumentos.generatePDF(doc);
+            if(window.NassauDocumentos) {
+                const blob = await window.NassauDocumentos.generatePDF(doc);
+                if (blob) window.open(URL.createObjectURL(blob), '_blank');
+            }
         } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); } 
         finally { window.NassauApp.showLoading(false); }
     }
