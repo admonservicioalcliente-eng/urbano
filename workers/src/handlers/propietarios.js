@@ -82,27 +82,31 @@ export async function handleCreate(request, env, user) {
     await query(env, `ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
   }
 
-  // si vienen coeficientes, calcular cuota real
-  let cuotaFinal = parseFloat(cuota_admon) || 0;
-  if ((coef_apto || coef_celda || coef_cuarto_util) && (parseFloat(coef_apto) > 0 || parseFloat(coef_celda) > 0 || parseFloat(coef_cuarto_util) > 0)) {
+  const cuotaManual = parseFloat(cuota_admon) || 0;
+  let cuotaTotal = cuotaManual;
+  const tieneCoef = (parseFloat(coef_apto)>0 || (has_celda && parseFloat(coef_celda)>0) || (has_cuarto_util && parseFloat(coef_cuarto_util)>0) || (has_celda && parseFloat(valor_celda)>0) || (has_cuarto_util && parseFloat(valor_cuarto_util)>0));
+  if (tieneCoef) {
     try {
       const pr = await query(env, `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id=$1 AND anio=EXTRACT(YEAR FROM NOW())`, [urbId]);
       const presupuesto = pr.length ? parseFloat(pr[0].cuota_admon) : 0;
-      cuotaFinal = calcCuota(presupuesto, { coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util, cuota_admon });
+      if (presupuesto>0) cuotaTotal = calcCuota(presupuesto, { coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util, cuota_admon: cuotaManual });
+      else cuotaTotal = cuotaManual;
     } catch {}
   }
+  // asegurar columna cuota_total exista
+  try { await query(env, `SELECT cuota_total FROM propietarios LIMIT 0`); } catch { await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`); }
 
   try {
     const rows = await query(env,
       `INSERT INTO propietarios (
         urbanizacion_id, nombre_propietario, apartamento, no_celda, 
-        cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas,
+        cuota_admon, cuota_total, estado, numero_cuenta, modo_pago, telefono, email, notas,
         prefijo, mes_inicio, anio_inicio, abono_inicial,
         coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
       [
         urbId, nombre_propietario, apartamento, no_celda || null, 
-        cuotaFinal, estado || 'activo', numero_cuenta || null, modo_pago || 'efectivo',
+        cuotaManual, cuotaTotal, estado || 'activo', numero_cuenta || null, modo_pago || 'efectivo',
         telefono || null, email || null, notas || null,
         prefijo || null, mes_inicio || null, anio_inicio || null, parseFloat(abono_inicial) || 0,
         parseFloat(coef_apto) || 0, parseFloat(coef_celda) || 0, parseFloat(coef_cuarto_util) || 0,
@@ -157,9 +161,12 @@ export async function handleUpdate(request, env, user, id) {
     }
   }
 
-  // recalcular cuota si vienen coeficientes
-  let cuotaUpd = cuota_admon;
-  if (coef_apto !== undefined || coef_celda !== undefined || coef_cuarto_util !== undefined || valor_celda !== undefined || valor_cuarto_util !== undefined) {
+  // asegurar cuota_total
+  try { await query(env, `SELECT cuota_total FROM propietarios LIMIT 0`); } catch { await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`); }
+  let cuotaManualUpd = cuota_admon;
+  let cuotaTotalUpd = undefined;
+  const needRecalc = coef_apto !== undefined || coef_celda !== undefined || coef_cuarto_util !== undefined || valor_celda !== undefined || valor_cuarto_util !== undefined || has_celda !== undefined || has_cuarto_util !== undefined || cuota_admon !== undefined;
+  if (needRecalc) {
     try {
       const curb = await query(env, `SELECT urbanizacion_id FROM propietarios WHERE id=$1`, [id]);
       const urbId2 = curb[0]?.urbanizacion_id;
@@ -177,9 +184,11 @@ export async function handleUpdate(request, env, user, id) {
         has_cuarto_util: has_cuarto_util !== undefined ? has_cuarto_util : curP.has_cuarto_util,
         cuota_admon: cuota_admon !== undefined ? cuota_admon : curP.cuota_admon
       };
-      cuotaUpd = calcCuota(presupuesto2, merged);
-      // si no hay presupuesto, usar cuota enviada directo
-      if (!presupuesto2) cuotaUpd = cuota_admon;
+      const manual = parseFloat(merged.cuota_admon)||0;
+      const tieneCoef2 = (parseFloat(merged.coef_apto)>0 || (merged.has_celda && parseFloat(merged.coef_celda)>0) || (merged.has_cuarto_util && parseFloat(merged.coef_cuarto_util)>0) || (merged.has_celda && parseFloat(merged.valor_celda)>0) || (merged.has_cuarto_util && parseFloat(merged.valor_cuarto_util)>0));
+      if (tieneCoef2 && presupuesto2>0) cuotaTotalUpd = calcCuota(presupuesto2, merged);
+      else cuotaTotalUpd = manual;
+      cuotaManualUpd = manual;
     } catch {}
   }
 
@@ -189,26 +198,27 @@ export async function handleUpdate(request, env, user, id) {
       apartamento = COALESCE($2, apartamento),
       no_celda = $3,
       cuota_admon = COALESCE($4, cuota_admon),
-      estado = COALESCE($5, estado),
-      numero_cuenta = $6,
-      modo_pago = COALESCE($7, modo_pago),
-      telefono = $8,
-      email = $9,
-      notas = $10,
-      prefijo = $11,
-      mes_inicio = $12,
-      anio_inicio = $13,
-      abono_inicial = COALESCE($14, abono_inicial),
-      coef_apto = COALESCE($15, coef_apto),
-      coef_celda = COALESCE($16, coef_celda),
-      coef_cuarto_util = COALESCE($17, coef_cuarto_util),
-      valor_celda = COALESCE($18, valor_celda),
-      valor_cuarto_util = COALESCE($19, valor_cuarto_util),
-      has_celda = COALESCE($20, has_celda),
-      has_cuarto_util = COALESCE($21, has_cuarto_util),
+      cuota_total = COALESCE($5, cuota_total),
+      estado = COALESCE($6, estado),
+      numero_cuenta = $7,
+      modo_pago = COALESCE($8, modo_pago),
+      telefono = $9,
+      email = $10,
+      notas = $11,
+      prefijo = $12,
+      mes_inicio = $13,
+      anio_inicio = $14,
+      abono_inicial = COALESCE($15, abono_inicial),
+      coef_apto = COALESCE($16, coef_apto),
+      coef_celda = COALESCE($17, coef_celda),
+      coef_cuarto_util = COALESCE($18, coef_cuarto_util),
+      valor_celda = COALESCE($19, valor_celda),
+      valor_cuarto_util = COALESCE($20, valor_cuarto_util),
+      has_celda = COALESCE($21, has_celda),
+      has_cuarto_util = COALESCE($22, has_cuarto_util),
       updated_at = NOW()
-    WHERE id = $22 RETURNING *`,
-    [nombre_propietario || null, apartamento || null, no_celda || null, cuotaUpd === undefined ? null : parseFloat(cuotaUpd) || null, estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
+    WHERE id = $23 RETURNING *`,
+    [nombre_propietario || null, apartamento || null, no_celda || null, cuotaManualUpd === undefined ? null : parseFloat(cuotaManualUpd) || null, cuotaTotalUpd === undefined ? null : parseFloat(cuotaTotalUpd) || null, estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
      coef_apto === undefined ? null : parseFloat(coef_apto) || 0,
      coef_celda === undefined ? null : parseFloat(coef_celda) || 0,
      coef_cuarto_util === undefined ? null : parseFloat(coef_cuarto_util) || 0,
@@ -285,8 +295,7 @@ async function sembrarEstadosInicio(env, prop) {
       // se guardará desglose abajo en insert si columnas existen
       prop._desglose = { vApto: Math.round(vApto*100)/100, vCelda: Math.round(vCelda*100)/100, vCuarto: Math.round(vCuarto*100)/100 };
     } else {
-      cuota = presupuestoAnio !== null ? presupuestoAnio : (parseFloat(prop.cuota_admon) || 0);
-      // si no hay coef, todo es apto
+      cuota = parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || (presupuestoAnio !== null ? presupuestoAnio : 0) || 0;
       prop._desglose = { vApto: cuota, vCelda: 0, vCuarto: 0 };
     }
 

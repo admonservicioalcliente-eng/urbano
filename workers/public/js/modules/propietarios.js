@@ -29,25 +29,12 @@ window.NassauPropietarios = {
     renderTable(data) {
         const tbody = document.querySelector('#props-table tbody');
         if (!tbody) return;
-        tbody.innerHTML = data.map(p => `
-            <tr>
-                <td>${p.apartamento}</td><td>${p.prefijo || '-'}</td><td>${p.no_celda || '-'}</td><td>${p.nombre_propietario}</td>
-                <td>$${Number(p.cuota_admon).toLocaleString()}</td><td>${p.modo_pago}</td>
-                <td>
-                    <select data-id="${p.id}" data-orig="${p.estado}" class="search-input prop-estado-select" style="padding:0.2rem 0.4rem;">
-                        <option value="activo" ${p.estado === 'activo' ? 'selected' : ''}>Activo</option>
-                        <option value="moroso" ${p.estado === 'moroso' ? 'selected' : ''}>Moroso</option>
-                        <option value="abono_inicial" ${p.estado === 'abono_inicial' ? 'selected' : ''}>Abono Inicial</option>
-                        <option value="inactivo" ${p.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option>
-                    </select>
-                    <button class="btn-primary btn-sm prop-estado-update" data-id="${p.id}" style="display:none;">Actualizar</button>
-                </td>
-                <td>${p.ultimo_comprobante || '-'}</td>
-                <td>
-                    <button class="btn-secondary btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.showEditModal(this.dataset.id)">Editar</button>
-                    <button class="btn-danger btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.deletePropietario(this.dataset.id)">Eliminar</button>
-                </td>
-            </tr>`).join('');
+        tbody.innerHTML = data.map(p => {
+            const total = Number(p.cuota_total) || Number(p.cuota_admon) || 0;
+            const manual = Number(p.cuota_admon) || 0;
+            const isTotal = p.cuota_total && Number(p.cuota_total) !== manual;
+            return `<tr><td>${p.apartamento}</td><td>${p.prefijo || '-'}</td><td>${p.no_celda || '-'}</td><td>${p.nombre_propietario}</td><td>$${total.toLocaleString()}${isTotal ? `<br><small style="color:#888;">base $${manual.toLocaleString()}</small>` : ''}</td><td>${p.modo_pago}</td><td><select data-id="${p.id}" data-orig="${p.estado}" class="search-input prop-estado-select" style="padding:0.2rem 0.4rem;"><option value="activo" ${p.estado === 'activo' ? 'selected' : ''}>Activo</option><option value="moroso" ${p.estado === 'moroso' ? 'selected' : ''}>Moroso</option><option value="abono_inicial" ${p.estado === 'abono_inicial' ? 'selected' : ''}>Abono Inicial</option><option value="inactivo" ${p.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option></select><button class="btn-primary btn-sm prop-estado-update" data-id="${p.id}" style="display:none;">Actualizar</button></td><td>${p.ultimo_comprobante || '-'}</td><td><button class="btn-secondary btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.showEditModal(this.dataset.id)">Editar</button><button class="btn-danger btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.deletePropietario(this.dataset.id)">Eliminar</button></td></tr>`;
+        }).join('');
         tbody.querySelectorAll('.prop-estado-select').forEach(sel => {
             sel.addEventListener('change', () => {
                 const btn = sel.closest('tr').querySelector('.prop-estado-update');
@@ -91,7 +78,10 @@ window.NassauPropietarios = {
         setTimeout(() => this.calcCuotaPreview(), 100);
     },
     toggleInmueble(tipo) {
-        if (tipo === 'celda') {
+        if (tipo === 'apto') {
+            const chk = document.getElementById('prop-has-apto');
+            document.getElementById('prop-apto-fields').style.display = chk.checked ? 'flex' : 'none';
+        } else if (tipo === 'celda') {
             const chk = document.getElementById('prop-has-celda');
             document.getElementById('prop-celda-fields').style.display = chk.checked ? 'flex' : 'none';
         } else {
@@ -103,6 +93,8 @@ window.NassauPropietarios = {
     async calcCuotaPreview() {
         const preview = document.getElementById('prop-cuota-preview');
         const hidden = document.getElementById('prop-cuota');
+        const totalInput = document.getElementById('prop-cuota-total');
+        const manualInput = document.getElementById('prop-cuota-admon');
         if (!preview) return;
         let presupuesto = 0;
         try {
@@ -111,7 +103,8 @@ window.NassauPropietarios = {
             const actual = params.find(p => Number(p.anio) === anio) || params[0];
             presupuesto = parseFloat(actual?.cuota_admon) || 0;
         } catch {}
-        const coefApto = parseFloat(document.getElementById('prop-coef-apto')?.value) || 0;
+        const hasApto = document.getElementById('prop-has-apto')?.checked;
+        const coefApto = hasApto ? (parseFloat(document.getElementById('prop-coef-apto')?.value) || 0) : 0;
         const hasCelda = document.getElementById('prop-has-celda')?.checked;
         const coefCelda = hasCelda ? (parseFloat(document.getElementById('prop-coef-celda')?.value) || 0) : 0;
         const valCelda = hasCelda ? (parseFloat(document.getElementById('prop-valor-celda')?.value) || 0) : 0;
@@ -119,22 +112,29 @@ window.NassauPropietarios = {
         const coefCuarto = hasCuarto ? (parseFloat(document.getElementById('prop-coef-cuarto')?.value) || 0) : 0;
         const valCuarto = hasCuarto ? (parseFloat(document.getElementById('prop-valor-cuarto')?.value) || 0) : 0;
         const suma = coefApto + coefCelda + coefCuarto;
+        const cuotaManual = parseFloat(manualInput?.value) || 0;
         let base = 0, vApto=0, vCelda=0, vCuarto=0, total=0;
-        if (presupuesto > 0 && suma > 0) {
-            vApto = presupuesto * coefApto / 100;
+        const tieneCoef = hasApto || hasCelda || hasCuarto;
+        if (tieneCoef && presupuesto > 0 && suma > 0) {
+            vApto = hasApto ? presupuesto * coefApto / 100 : 0;
             vCelda = hasCelda ? (presupuesto * coefCelda / 100 + valCelda) : 0;
             vCuarto = hasCuarto ? (presupuesto * coefCuarto / 100 + valCuarto) : 0;
             base = presupuesto * suma / 100;
             total = base + valCelda + valCuarto;
         } else {
-            // fallback si no hay presupuesto o coeficientes
-            total = parseFloat(hidden?.value) || 0;
+            total = cuotaManual || parseFloat(hidden?.value) || 0;
             vApto = total;
         }
         if (hidden) hidden.value = Math.round(total);
-        preview.innerHTML = presupuesto ? `Presupuesto $${presupuesto.toLocaleString()} × (${coefApto}+${coefCelda}+${coefCuarto})%/100 + $${valCelda.toLocaleString()} + $${valCuarto.toLocaleString()}<br>
+        if (totalInput) totalInput.value = Math.round(total);
+        // validación: si no hay manual ni coef, avisar
+        if (!tieneCoef && !cuotaManual) {
+            preview.innerHTML = `<span style="color:#ff6b6b;">Ingrese Valor Cuota Admon o marque al menos un inmueble con coeficiente</span><br><b>Total: $0</b>`;
+        } else {
+            preview.innerHTML = (tieneCoef && presupuesto) ? `Presupuesto $${presupuesto.toLocaleString()} × (${coefApto}+${coefCelda}+${coefCuarto})%/100 + $${valCelda.toLocaleString()} + $${valCuarto.toLocaleString()}<br>
             <b>Apto:</b> $${Math.round(vApto).toLocaleString()} ${hasCelda ? `| <b>Celda:</b> $${Math.round(vCelda).toLocaleString()}` : ''} ${hasCuarto ? `| <b>Cuarto:</b> $${Math.round(vCuarto).toLocaleString()}` : ''}<br>
-            <b>Total Cuota Admón: $${Math.round(total).toLocaleString()}</b>` : `Total Cuota: $${Math.round(total).toLocaleString()} (sin presupuesto año actual)`;
+            <b>Valor Total Cuota: $${Math.round(total).toLocaleString()}</b> ${!tieneCoef ? `(= Cuota Admon manual)` : ''}` : `Valor Total Cuota: $${Math.round(total).toLocaleString()}${tieneCoef ? ' (sin presupuesto año actual)' : ' (manual)'}`;
+        }
     },
     async autofillPrefijo() {
         try {
@@ -156,11 +156,14 @@ window.NassauPropietarios = {
         const mostrarAbono = p.estado === 'abono_inicial';
         const hasCelda = !!(p.has_celda || p.no_celda);
         const hasCuarto = !!p.has_cuarto_util;
+        const hasApto = !!(parseFloat(p.coef_apto) > 0);
         const coefApto = p.coef_apto || '';
         const coefCelda = p.coef_celda || '';
         const coefCuarto = p.coef_cuarto_util || '';
         const valCelda = p.valor_celda || '';
         const valCuarto = p.valor_cuarto_util || '';
+        const cuotaManual = p.cuota_admon || p.cuota_total || '';
+        const cuotaTotal = p.cuota_total || '';
         return `
             <form id="prop-form" onsubmit="window.NassauPropietarios.savePropietario(event)">
                 <div class="form-group"><label>Nombre Completo</label><input type="text" id="prop-nombre" value="${p.nombre_propietario || ''}" required></div>
@@ -168,11 +171,17 @@ window.NassauPropietarios = {
                     <div class="form-group"><label>Apartamento</label><input type="text" id="prop-apto" value="${p.apartamento || ''}" required></div>
                     <div class="form-group"><label>Prefijo Documento</label><input type="text" id="prop-prefijo" value="${p.prefijo || ''}" maxlength="10" placeholder="Ej: NAS"></div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Valor Cuota Admon $</label><input type="number" step="1000" min="0" id="prop-cuota-admon" value="${cuotaManual}" placeholder="Ej: 250000" oninput="window.NassauPropietarios.calcCuotaPreview()"></div>
+                    <div class="form-group"><label>Valor Total Cuota Admon $</label><input type="number" id="prop-cuota-total" value="${cuotaTotal}" readonly style="background:#222; color:#fff; font-weight:bold;"></div>
+                </div>
                 <div style="border:1px solid #333; padding:12px; border-radius:8px; margin:12px 0; background:#111; color:#fff;">
                     <p style="font-weight:bold; margin:0 0 10px 0; text-align:left;">Inmuebles - coeficientes</p>
                     <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
-                        <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start;"><input type="checkbox" checked disabled> Apto</label>
-                        <div class="form-group" style="margin:0; width:220px;"><label style="color:#fff; text-align:left; display:block;">Coef. Apto %</label><input type="number" step="0.0001" min="0" max="100" id="prop-coef-apto" value="${coefApto}" placeholder="Ej: 0.85" oninput="window.NassauPropietarios.calcCuotaPreview()" style="background:#000; color:#fff; border:1px solid #444;"></div>
+                        <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start;"><input type="checkbox" id="prop-has-apto" ${hasApto ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('apto')"> Apto</label>
+                        <div id="prop-apto-fields" style="display:${hasApto ? 'flex' : 'none'}; gap:10px; flex-wrap:wrap; margin-left:22px; align-items:end;">
+                            <div class="form-group" style="margin:0; width:220px;"><label style="color:#fff; text-align:left; display:block;">Coef. Apto %</label><input type="number" step="0.0001" min="0" max="100" id="prop-coef-apto" value="${coefApto}" placeholder="Ej: 0.85" oninput="window.NassauPropietarios.calcCuotaPreview()" style="background:#000; color:#fff; border:1px solid #444;"></div>
+                        </div>
                     </div>
                     <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
                         <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start;"><input type="checkbox" id="prop-has-celda" ${hasCelda ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('celda')"> Celda</label>
@@ -190,7 +199,7 @@ window.NassauPropietarios = {
                         </div>
                     </div>
                     <div id="prop-cuota-preview" style="margin-top:12px; padding:8px; background:#000; border:1px dashed #555; border-radius:6px; font-size:0.9rem; color:#fff; text-align:left;">Calculando cuota...</div>
-                    <input type="hidden" id="prop-cuota" value="${p.cuota_admon || ''}">
+                    <input type="hidden" id="prop-cuota" value="${cuotaTotal || cuotaManual || ''}">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -279,14 +288,26 @@ window.NassauPropietarios = {
     async savePropietario(e) {
         e.preventDefault();
         await this.calcCuotaPreview();
+        const hasApto = document.getElementById('prop-has-apto')?.checked || false;
         const hasCelda = document.getElementById('prop-has-celda')?.checked || false;
         const hasCuarto = document.getElementById('prop-has-cuarto')?.checked || false;
+        const cuotaManual = parseFloat(document.getElementById('prop-cuota-admon')?.value) || 0;
+        const cuotaTotal = parseFloat(document.getElementById('prop-cuota-total')?.value) || parseFloat(document.getElementById('prop-cuota')?.value) || 0;
+        if (!cuotaManual && !hasApto && !hasCelda && !hasCuarto) {
+            window.NassauApp.showToast('Debe ingresar Valor Cuota Admon o marcar al menos un inmueble con coeficiente', 'error');
+            return;
+        }
+        if (hasApto && !(parseFloat(document.getElementById('prop-coef-apto')?.value) > 0)) {
+            window.NassauApp.showToast('Coef. Apto requerido si marca Apto', 'error');
+            return;
+        }
         const data = {
             nombre_propietario: document.getElementById('prop-nombre').value.trim(),
             apartamento: document.getElementById('prop-apto').value.trim(),
             no_celda: hasCelda ? (document.getElementById('prop-celda')?.value.trim() || null) : null,
-            cuota_admon: parseFloat(document.getElementById('prop-cuota').value) || 0,
-            coef_apto: parseFloat(document.getElementById('prop-coef-apto')?.value) || 0,
+            cuota_admon: cuotaManual,
+            cuota_total: cuotaTotal,
+            coef_apto: hasApto ? (parseFloat(document.getElementById('prop-coef-apto')?.value) || 0) : 0,
             coef_celda: hasCelda ? (parseFloat(document.getElementById('prop-coef-celda')?.value) || 0) : 0,
             coef_cuarto_util: hasCuarto ? (parseFloat(document.getElementById('prop-coef-cuarto')?.value) || 0) : 0,
             valor_celda: hasCelda ? (parseFloat(document.getElementById('prop-valor-celda')?.value) || 0) : 0,

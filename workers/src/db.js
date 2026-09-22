@@ -55,14 +55,16 @@ export async function ensureMigrations(env) {
          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_apto DECIMAL(10,4) DEFAULT 0`);
          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_celda DECIMAL(10,4) DEFAULT 0`);
          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_cuarto_util DECIMAL(10,4) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
-         // Estados de cuenta: desglose por item
-         await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`UPDATE propietarios SET cuota_total = cuota_admon WHERE cuota_total IS NULL OR cuota_total = 0`);
+          // Estados de cuenta: desglose por item
+          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
          // Función generar_cuotas_mes con fórmula de coeficientes
          await sql.unsafe(`
          CREATE OR REPLACE FUNCTION generar_cuotas_mes(p_urbanizacion_id UUID, p_anio INT, p_mes INT)
@@ -105,10 +107,10 @@ export async function ensureMigrations(env) {
                      v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100 + COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100 + COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
                      v_total_cuota:=ROUND(v_presupuesto * v_sum_coef/100 + COALESCE(v_prop.valor_celda,0)*CASE WHEN COALESCE(v_prop.has_celda,false) THEN 1 ELSE 0 END + COALESCE(v_prop.valor_cuarto_util,0)*CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN 1 ELSE 0 END,2);
-                 ELSE
-                     v_total_cuota:=CASE WHEN v_presupuesto>0 THEN v_presupuesto ELSE COALESCE(v_prop.cuota_admon,0) END;
-                     v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
-                 END IF;
+                  ELSE
+                      v_total_cuota:=COALESCE(v_prop.cuota_total, CASE WHEN v_presupuesto>0 THEN v_presupuesto ELSE COALESCE(v_prop.cuota_admon,0) END, 0);
+                      v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
+                  END IF;
                  BEGIN
                      INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
                      VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_saldo_ant, 0, 0, v_fecha_vcto) ON CONFLICT (propietario_id, anio, mes) DO NOTHING;
