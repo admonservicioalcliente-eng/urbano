@@ -68,6 +68,20 @@ export async function handleCreate(request, env, user) {
   const urbId = user.urbanizacion_id;
   if (!urbId) return err(400, 'El usuario no tiene una urbanización asignada');
 
+  // asegurar columnas nuevas existan (por si migración aún no corrió)
+  try { await query(env, `SELECT coef_apto FROM propietarios LIMIT 0`); } catch {
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_apto DECIMAL(10,4) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_celda DECIMAL(10,4) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_cuarto_util DECIMAL(10,4) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
+    await query(env, `ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+  }
+
   // si vienen coeficientes, calcular cuota real
   let cuotaFinal = parseFloat(cuota_admon) || 0;
   if ((coef_apto || coef_celda || coef_cuarto_util) && (parseFloat(coef_apto) > 0 || parseFloat(coef_celda) > 0 || parseFloat(coef_cuarto_util) > 0)) {
@@ -124,6 +138,17 @@ export async function handleUpdate(request, env, user, id) {
   }
 
   const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
+
+  // asegurar columnas
+  try { await query(env, `SELECT coef_apto FROM propietarios LIMIT 0`); } catch {
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_apto DECIMAL(10,4) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_celda DECIMAL(10,4) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_cuarto_util DECIMAL(10,4) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
+    await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
+  }
 
   if (estado === 'moroso' || estado === 'abono_inicial') {
     if (!mes_inicio || !anio_inicio) return err(400, 'Para el estado ' + estado + ' debe indicar el mes y año de inicio');
