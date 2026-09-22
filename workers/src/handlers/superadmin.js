@@ -6,7 +6,7 @@ export async function handleRegistroUrbanizacion(request, env) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { nombre, direccion, telefono, email, prefijo_doc, admin_nombre, admin_email, admin_password, logo_base64 } = body;
+  const { nombre, direccion, telefono, email, prefijo_doc, admin_nombre, admin_email, admin_password, logo_base64, banco_numero_cuenta, banco_tipo_cuenta, banco_nombre, banco_titular, banco_celular } = body;
   if (!nombre) return err(400, 'El nombre de la urbanización es obligatorio');
   if (!admin_nombre || !admin_email || !admin_password) return err(400, 'Nombre, email y contraseña del administrador son obligatorios');
   if (!admin_email.includes('@') || !admin_email.includes('.')) return err(400, 'El email de acceso no es válido');
@@ -19,9 +19,9 @@ export async function handleRegistroUrbanizacion(request, env) {
     if (existing.length) return err(400, 'Ya existe un usuario con ese email');
 
     const urb = await query(env,
-      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc, logo_base64, plan_activo, fecha_expiracion)
-       VALUES ($1, $2, $3, $4, 'pendiente', $5, $6, FALSE, NOW() + INTERVAL '1 year') RETURNING *`,
-      [nombre.trim(), direccion || null, telefono || null, email || null, (prefijo_doc || 'NAS').toUpperCase().substring(0, 10), logo_base64 || null]
+      `INSERT INTO urbanizaciones (nombre, direccion, telefono, email, estado, prefijo_doc, logo_base64, banco_numero_cuenta, banco_tipo_cuenta, banco_nombre, banco_titular, banco_celular, plan_activo, fecha_expiracion)
+       VALUES ($1, $2, $3, $4, 'pendiente', $5, $6, $7, $8, $9, $10, $11, FALSE, NOW() + INTERVAL '1 year') RETURNING *`,
+      [nombre.trim(), direccion || null, telefono || null, email || null, (prefijo_doc || 'NAS').toUpperCase().substring(0, 10), logo_base64 || null, banco_numero_cuenta || null, banco_tipo_cuenta || 'ahorros', banco_nombre || null, banco_titular || null, banco_celular || null]
     );
 
     const usr = await query(env,
