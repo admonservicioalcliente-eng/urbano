@@ -10,7 +10,7 @@ window.NassauPropietarios = {
             </div>
             <div class="card table-container">
                 <table class="premium-table" id="props-table">
-                    <thead><tr><th>Apartamento</th><th>Prefijo Doc</th><th>Celda</th><th>Nombre</th><th>Cuota Admon</th><th>Modo Pago</th><th>Estado</th><th>Último Comprobante</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Apartamento</th><th>Prefijo Doc</th><th>Celda</th><th>Nombre</th><th>Valor Cuota Admon</th><th>Valor Total Cuota</th><th>Modo Pago</th><th>Estado</th><th>Último Comprobante</th><th>Acciones</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>`;
@@ -30,10 +30,9 @@ window.NassauPropietarios = {
         const tbody = document.querySelector('#props-table tbody');
         if (!tbody) return;
         tbody.innerHTML = data.map(p => {
-            const total = Number(p.cuota_total) || Number(p.cuota_admon) || 0;
             const manual = Number(p.cuota_admon) || 0;
-            const isTotal = p.cuota_total && Number(p.cuota_total) !== manual;
-            return `<tr><td>${p.apartamento}</td><td>${p.prefijo || '-'}</td><td>${p.no_celda || '-'}</td><td>${p.nombre_propietario}</td><td>$${total.toLocaleString()}${isTotal ? `<br><small style="color:#888;">base $${manual.toLocaleString()}</small>` : ''}</td><td>${p.modo_pago}</td><td><select data-id="${p.id}" data-orig="${p.estado}" class="search-input prop-estado-select" style="padding:0.2rem 0.4rem;"><option value="activo" ${p.estado === 'activo' ? 'selected' : ''}>Activo</option><option value="moroso" ${p.estado === 'moroso' ? 'selected' : ''}>Moroso</option><option value="abono_inicial" ${p.estado === 'abono_inicial' ? 'selected' : ''}>Abono Inicial</option><option value="inactivo" ${p.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option></select><button class="btn-primary btn-sm prop-estado-update" data-id="${p.id}" style="display:none;">Actualizar</button></td><td>${p.ultimo_comprobante || '-'}</td><td><button class="btn-secondary btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.showEditModal(this.dataset.id)">Editar</button><button class="btn-danger btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.deletePropietario(this.dataset.id)">Eliminar</button></td></tr>`;
+            const total = Number(p.cuota_total) || manual || 0;
+            return `<tr><td>${p.apartamento}</td><td>${p.prefijo || '-'}</td><td>${p.no_celda || '-'}</td><td>${p.nombre_propietario}</td><td>$${manual.toLocaleString()}</td><td><b>$${total.toLocaleString()}</b></td><td>${p.modo_pago}</td><td><select data-id="${p.id}" data-orig="${p.estado}" class="search-input prop-estado-select" style="padding:0.2rem 0.4rem;"><option value="activo" ${p.estado === 'activo' ? 'selected' : ''}>Activo</option><option value="moroso" ${p.estado === 'moroso' ? 'selected' : ''}>Moroso</option><option value="abono_inicial" ${p.estado === 'abono_inicial' ? 'selected' : ''}>Abono Inicial</option><option value="inactivo" ${p.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option></select><button class="btn-primary btn-sm prop-estado-update" data-id="${p.id}" style="display:none;">Actualizar</button></td><td>${p.ultimo_comprobante || '-'}</td><td><button class="btn-secondary btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.showEditModal(this.dataset.id)">Editar</button><button class="btn-danger btn-sm" data-id="${p.id}" onclick="window.NassauPropietarios.deletePropietario(this.dataset.id)">Eliminar</button></td></tr>`;
         }).join('');
         tbody.querySelectorAll('.prop-estado-select').forEach(sel => {
             sel.addEventListener('change', () => {
