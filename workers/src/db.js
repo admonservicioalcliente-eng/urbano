@@ -63,6 +63,64 @@ export async function ensureMigrations(env) {
          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+         // Función generar_cuotas_mes con fórmula de coeficientes
+         await sql.unsafe(`
+         CREATE OR REPLACE FUNCTION generar_cuotas_mes(p_urbanizacion_id UUID, p_anio INT, p_mes INT)
+         RETURNS INTEGER AS $$
+         DECLARE
+             v_prop          RECORD;
+             v_params        RECORD;
+             v_saldo_ant     DECIMAL(12,2);
+             v_fecha_vcto    DATE;
+             v_mes_anterior  INT;
+             v_anio_anterior INT;
+             v_count         INTEGER := 0;
+             v_cuota_extra   DECIMAL(12,2) := 0;
+             v_inicio_mes_idx INTEGER := 0;
+             v_mes_actual_idx INTEGER := 0;
+             v_fin_mes_idx   INTEGER := 0;
+             v_presupuesto   DECIMAL(12,2);
+             v_sum_coef      DECIMAL(10,4);
+             v_total_cuota   DECIMAL(12,2);
+             v_vapto DECIMAL(12,2); v_vcelda DECIMAL(12,2); v_vcuarto DECIMAL(12,2);
+         BEGIN
+             SELECT * INTO v_params FROM parametros_anio WHERE urbanizacion_id = p_urbanizacion_id AND anio = p_anio;
+             IF NOT FOUND THEN RAISE EXCEPTION 'Sin parámetros para año %', p_anio; END IF;
+             v_fecha_vcto := MAKE_DATE(p_anio, p_mes, v_params.dia_vencimiento_sin_mora);
+             IF p_mes = 1 THEN v_mes_anterior:=12; v_anio_anterior:=p_anio-1; ELSE v_mes_anterior:=p_mes-1; v_anio_anterior:=p_anio; END IF;
+             FOR v_prop IN SELECT * FROM propietarios WHERE urbanizacion_id = p_urbanizacion_id AND estado != 'inactivo' LOOP
+                 SELECT GREATEST(0, COALESCE(total_deuda,0)-COALESCE(saldo_favor,0)) INTO v_saldo_ant FROM estados_cuenta WHERE propietario_id=v_prop.id AND anio=v_anio_anterior AND mes=v_mes_anterior;
+                 IF v_saldo_ant IS NULL THEN v_saldo_ant:=0; END IF;
+                 v_cuota_extra:=0;
+                 IF v_params.cuota_extra > 0 THEN
+                     v_inicio_mes_idx:=(v_params.cuota_extra_anio_inicio-1)*12+v_params.cuota_extra_mes_inicio;
+                     v_mes_actual_idx:=(p_anio-1)*12+p_mes;
+                     v_fin_mes_idx:=v_inicio_mes_idx+v_params.cuota_extra_duracion-1;
+                     IF v_mes_actual_idx >= v_inicio_mes_idx AND v_mes_actual_idx <= v_fin_mes_idx THEN v_cuota_extra:=v_params.cuota_extra; END IF;
+                 END IF;
+                 v_presupuesto:=COALESCE(v_params.cuota_admon,0);
+                 v_sum_coef:=COALESCE(v_prop.coef_apto,0) + CASE WHEN COALESCE(v_prop.has_celda,false) THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
+                 IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
+                     v_vapto:=ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2);
+                     v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100 + COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
+                     v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100 + COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
+                     v_total_cuota:=ROUND(v_presupuesto * v_sum_coef/100 + COALESCE(v_prop.valor_celda,0)*CASE WHEN COALESCE(v_prop.has_celda,false) THEN 1 ELSE 0 END + COALESCE(v_prop.valor_cuarto_util,0)*CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN 1 ELSE 0 END,2);
+                 ELSE
+                     v_total_cuota:=CASE WHEN v_presupuesto>0 THEN v_presupuesto ELSE COALESCE(v_prop.cuota_admon,0) END;
+                     v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
+                 END IF;
+                 BEGIN
+                     INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+                     VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_saldo_ant, 0, 0, v_fecha_vcto) ON CONFLICT (propietario_id, anio, mes) DO NOTHING;
+                 EXCEPTION WHEN undefined_column THEN
+                     INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+                     VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_saldo_ant, 0, 0, v_fecha_vcto) ON CONFLICT (propietario_id, anio, mes) DO NOTHING;
+                 END;
+                 v_count:=v_count+1;
+             END LOOP;
+             RETURN v_count;
+         END; $$ LANGUAGE plpgsql;
+         `);
         // Activar urbanizaciones existentes que ya estaban admitidas
         await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
 

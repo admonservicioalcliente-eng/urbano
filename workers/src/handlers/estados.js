@@ -38,14 +38,23 @@ export async function handleGetByPropietario(request, env, user) {
   if (parseInt(anio) === anioActual && propRows[0].estado !== 'inactivo') {
     const yaTieneMes = estados.some(e => parseInt(e.mes) === mesActual);
     if (!yaTieneMes) {
+      const propFull = await query(env, `SELECT * FROM propietarios WHERE id=$1`, [propId]);
+      const pf = propFull[0] || propRows[0];
       const params = await query(env,
         `SELECT cuota_admon FROM parametros_anio
          WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
         [propRows[0].urbanizacion_id, anioActual]
       );
-      const cuota = (params.length && parseFloat(params[0].cuota_admon) > 0)
-        ? parseFloat(params[0].cuota_admon)
-        : (parseFloat(propRows[0].cuota_admon) || 0);
+      const presupuesto = params.length ? parseFloat(params[0].cuota_admon) : 0;
+      let cuota;
+      const sumCoef = (parseFloat(pf.coef_apto)||0) + (pf.has_celda ? parseFloat(pf.coef_celda)||0 :0) + (pf.has_cuarto_util ? parseFloat(pf.coef_cuarto_util)||0 :0);
+      if (presupuesto>0 && sumCoef>0) {
+        const vc = pf.has_celda ? parseFloat(pf.valor_celda)||0 :0;
+        const vq = pf.has_cuarto_util ? parseFloat(pf.valor_cuarto_util)||0 :0;
+        cuota = Math.round((presupuesto * sumCoef/100 + vc + vq)*100)/100;
+      } else {
+        cuota = (presupuesto>0 ? presupuesto : (parseFloat(propRows[0].cuota_admon)||0));
+      }
 
       virtualMesActual = true;
       estados.push({
