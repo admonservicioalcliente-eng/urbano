@@ -311,29 +311,27 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'normal'); doc.text(data.propietario_apto || data.apartamento || prop.apartamento || '', M + 24, b + 27);
             doc.line(M, b + 30, RIGHT, b + 30);
 
-            // Cabecera de conceptos
+            // Cabecera de conceptos + desglose en una sola línea (media carta)
+            let y0 = b + 30;
             try {
             const desglose = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
             if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util)) {
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(0,0,0);
-                let desTxt = `Desglose cuota mensual: Apto $${Number(desglose.valor_apto||0).toLocaleString()}`;
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0,0,0);
+                let desTxt = `Desglose: Apto $${Number(desglose.valor_apto||0).toLocaleString()}`;
                 if (desglose.valor_celda) desTxt += ` | Celda $${Number(desglose.valor_celda).toLocaleString()}`;
                 if (desglose.valor_cuarto_util) desTxt += ` | Cuarto $${Number(desglose.valor_cuarto_util).toLocaleString()}`;
-                if (desglose.presupuesto) desTxt += ` (Presupuesto $${Number(desglose.presupuesto).toLocaleString()})`;
-                const maxW = RIGHT - M;
-                if (doc.getTextWidth(desTxt) > maxW) desTxt = desTxt.substring(0, 95) + '...';
-                doc.setFillColor(255,255,200); doc.rect(M, b + 30.5, RIGHT-M, 5, 'F');
-                doc.text(desTxt, M+1, b + 33.8);
-                doc.setTextColor(0,0,0);
+                doc.setFillColor(255,255,200); doc.rect(M, y0, RIGHT-M, 4, 'F');
+                doc.text(desTxt, M+1, y0+2.8);
+                y0 += 6;
             }
             } catch(e) { console.warn('desglose draw failed', e); }
 
             doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
-            doc.text('CONCEPTO', M, b + 34.5); doc.text('VALOR', RIGHT - 12, b + 34.5, { align: 'right' });
-            doc.line(M, b + 36.5, RIGHT, b + 36.5);
+            doc.text('CONCEPTO', M, y0); doc.text('VALOR', RIGHT - 12, y0, { align: 'right' });
+            doc.line(M, y0+2, RIGHT, y0+2);
 
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-            let y = b + 40.5;
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+            let y = y0 + 6;
 
             const rows = [];
 
@@ -357,58 +355,55 @@ window.NassauDocumentos = {
                 }
             });
 
-            // fallback header desglose para cuentas antiguas sin valor_apto en periodos
             const desgloseHeader = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
+            // mostrar todos los meses pendientes (enero-agosto) en una sola línea por concepto
             todasLasCuotas.forEach(r => {
-                if (y > b + 80) return;
-                doc.setFont('helvetica', 'normal');
-                doc.text(r.label, M, y);
-                doc.text(`$${Math.abs(r.value).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
+                if (y > b + 88) return;
                 let va = Number(r.valor_apto||0), vc = Number(r.valor_celda||0), vq = Number(r.valor_cuarto_util||0);
                 let hasDes = va || vc || vq;
                 if (!hasDes && desgloseHeader && (desgloseHeader.valor_apto||desgloseHeader.valor_celda||desgloseHeader.valor_cuarto_util)) {
-                    // usar desglose del propietario para cuentas antiguas
-                    va = Number(desgloseHeader.valor_apto||0);
-                    vc = Number(desgloseHeader.valor_celda||0);
-                    vq = Number(desgloseHeader.valor_cuarto_util||0);
-                    hasDes = va||vc||vq;
+                    va = Number(desgloseHeader.valor_apto||0); vc = Number(desgloseHeader.valor_celda||0); vq = Number(desgloseHeader.valor_cuarto_util||0); hasDes = va||vc||vq;
                 }
-                if (hasDes && y <= b + 80) {
-                    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(60,60,60);
-                    let sub = `  Apto $${va.toLocaleString()}`;
+                let label = r.label;
+                if (hasDes) {
+                    let sub = ` (Apto $${va.toLocaleString()}`;
                     if (vc) sub += ` | Celda $${vc.toLocaleString()}`;
                     if (vq) sub += ` | Cuarto $${vq.toLocaleString()}`;
-                    doc.text(sub, M, y);
-                    doc.setFontSize(8.5); doc.setTextColor(0,0,0);
-                    y += 3.5;
+                    sub += `)`;
+                    label += sub;
+                    // truncar si excede ancho
+                    const maxW = (RIGHT - 12) - M - 28;
+                    if (doc.getTextWidth(label) > maxW) {
+                        label = label.substring(0, 72) + '...';
+                    }
                 }
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+                doc.text(label, M, y);
+                doc.text(`$${Math.abs(r.value).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                y += 4;
             });
 
-            // Cuotas extras
             (detalle?.cuotas_extras || []).forEach(e => {
-                if (y > b + 80) return;
-                doc.setFont('helvetica', 'normal');
+                if (y > b + 88) return;
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
                 doc.text(`Cuota extra: ${e.descripcion || ''}`, M, y);
                 doc.text(`$${Number(e.monto || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
+                y += 4;
             });
-
-            // Intereses
             if (Number(t.intereses || 0) > 0) {
-                doc.setFont('helvetica', 'normal');
+                if (y > b + 88) return;
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
                 doc.text('Intereses causados', M, y);
                 doc.text(`$${Number(t.intereses).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
+                y += 4;
             }
-
-            // Retroactivo Ley 675
             const retroactivo = detalle?.retroactivo;
             if (retroactivo && Number(retroactivo.monto || 0) > 0) {
-                doc.setFont('helvetica', 'normal');
+                if (y > b + 88) return;
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
                 doc.text(retroactivo.descripcion || 'Retroactivo Ley 675', M, y);
                 doc.text(`$${Number(retroactivo.monto).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
-                y += 4.3;
+                y += 4;
             }
 
 // Cuota Extra (verificar si aplica al mes actual)
