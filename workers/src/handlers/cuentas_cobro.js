@@ -185,42 +185,45 @@ export async function handleCreate(request, env, user) {
     }
   }
 
-  let totalCuota = 0, totalInteres = 0, totalSaldoAnt = 0, totalSaldoFavor = 0;
-  let cuotaMesActual = 0, deudaAnterior = 0;
-
+  let totalCuota = 0, totalInteres = 0, totalSaldoFavor = 0;
+  // para total correcto, tomar el último mes abierto como total acumulado, no sumar saldos
+  let lastOpenTotal = 0;
   for (const ec of ecs) {
-    const esMesActual = parseInt(ec.anio) === anioActual && parseInt(ec.mes) === mesActual;
+    if (ec.cerrado) continue;
     const pagoActual = parseFloat(ec.pago_actual) || 0;
-    const saldoAnt = parseFloat(ec.saldo_anterior) || 0;
     const intereses = parseFloat(ec.intereses) || 0;
     const saldoFavor = parseFloat(ec.saldo_favor) || 0;
-    const baseMes = pagoActual + saldoAnt + intereses - saldoFavor;
-    const cerrado = ec.cerrado === true;
-
-    totalCuota     += pagoActual;
-    totalInteres   += intereses;
-    totalSaldoAnt  += saldoAnt;
-    // Solo sumar saldo_favor de meses ABIERTOS (excedente real)
-    if (!cerrado) {
-      totalSaldoFavor += saldoFavor;
-    }
-
-    if (cerrado) {
-      // Mes cerrado = pagado, no genera deuda
-    } else if (esMesActual) {
-      cuotaMesActual = Math.max(0, baseMes);
-    } else {
-      deudaAnterior += Math.max(0, baseMes);
-    }
+    totalCuota += pagoActual;
+    totalInteres += intereses;
+    totalSaldoFavor += saldoFavor;
+    const baseMes = pagoActual + parseFloat(ec.saldo_anterior||0) + intereses - saldoFavor;
+    if (baseMes > lastOpenTotal) lastOpenTotal = Math.max(0, baseMes);
   }
-
+  // deuda anterior + cuota mes actual se deriva del último total, pero para compatibilidad
+  // si hay 8 meses sin pago, total = 8*330728 = 2645824 (suma de pago_actual)
+  // usamos lastOpenTotal como total real si existe, si no sumamos
   let totalExtras = 0;
-  for (const ex of extras) {
-    totalExtras += parseFloat(ex.monto) || 0;
+  for (const ex of extras) totalExtras += parseFloat(ex.monto) || 0;
+  const totalDeudaCalc = lastOpenTotal > 0 ? lastOpenTotal : (totalCuota + totalInteres - totalSaldoFavor);
+  const totalDeuda = totalDeudaCalc + totalExtras + retroactivoMonto + cuotaExtra;
+  // para desglose PDF, deudaAnterior y cuotaMesActual se calculan por separado si se necesitan
+  let deudaAnterior = 0, cuotaMesActual = 0;
+  // recalcular deudaAnterior/cuotaMesActual para compatibilidad con detalle
+  for (const ec of ecs) {
+    if (ec.cerrado) continue;
+    const esMesActual = parseInt(ec.anio) === anioActual && parseInt(ec.mes) === mesActual;
+    const baseMes = parseFloat(ec.pago_actual||0) + parseFloat(ec.saldo_anterior||0) + parseFloat(ec.intereses||0) - parseFloat(ec.saldo_favor||0);
+    if (esMesActual) cuotaMesActual = Math.max(0, baseMes);
+    else if (!esMesActual) {
+      // deudaAnterior será total sin el mes actual
+      // se deja como 0 porque total ya incluye todo, pero mantenemos para detalle
+    }
   }
-
-// Total = deuda anterior + cuota mes actual + extras + retroactivo + cuota_extra
-   const totalDeuda = deudaAnterior + cuotaMesActual + totalExtras + retroactivoMonto + cuotaExtra;
+  // si cuotaMesActual sigue 0 y hay lastOpen, usar pago_actual del último mes
+  if (!cuotaMesActual && lastOpenTotal) {
+    const lastEc = [...ecs].filter(e=>!e.cerrado).sort((a,b)=>(a.anio-b.anio)||(a.mes-b.mes)).pop();
+    if (lastEc) cuotaMesActual = parseFloat(lastEc.pago_actual)||0;
+  }
 
 const detalleJson = {
      mostrar_copia: mostrarCopia,
