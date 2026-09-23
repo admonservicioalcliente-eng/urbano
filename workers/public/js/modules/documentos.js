@@ -7,13 +7,21 @@ window.NassauDocumentos = {
                 <button class="btn-secondary" onclick="window.NassauDocumentos.loadDocumentos()">Actualizar</button>
             </div>
             <div class="card">
-                <div style="margin-bottom: 1rem;">
-                    <label for="select-propietario" style="font-weight: bold; margin-right: 0.5rem;">Propietario:</label>
-                    <select id="select-propietario" onchange="window.NassauDocumentos.filtrarPorPropietario()" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; min-width: 250px;">
-                        <option value="">-- Seleccionar propietario --</option>
-                    </select>
+                <div style="margin-bottom: 1rem; display:flex; gap:1rem; flex-wrap:wrap; align-items:center;">
+                    <div>
+                        <label for="select-propietario" style="font-weight: bold; margin-right: 0.5rem;">Propietario:</label>
+                        <select id="select-propietario" onchange="window.NassauDocumentos.filtrarPorPropietario()" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; min-width: 250px;">
+                            <option value="">-- Seleccionar propietario --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="select-anio-cobro" style="font-weight: bold; margin-right: 0.5rem;">Año:</label>
+                        <select id="select-anio-cobro" onchange="window.NassauDocumentos.filtrarPorPropietario()" style="padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; min-width: 120px;">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
                 </div>
-                <div id="docs-por-propietario"></div>
+                <div id="docs-por-propietario"><p class="text-center" style="color:#888;">Seleccione un propietario para ver sus cuentas de cobro</p></div>
             </div>`;
         document.getElementById('page-cobros').innerHTML = html;
         await this.loadDocumentos();
@@ -37,7 +45,7 @@ window.NassauDocumentos = {
                  propietarios[propId].docs.push(d);
              });
             
-            // Llenar select
+            // Llenar select propietario
             const select = document.getElementById('select-propietario');
             select.innerHTML = '<option value="">-- Seleccionar propietario --</option>';
             Object.keys(propietarios).sort((a, b) => propietarios[a].nombre.localeCompare(propietarios[b].nombre)).forEach(propId => {
@@ -47,8 +55,15 @@ window.NassauDocumentos = {
                 option.textContent = `${prop.nombre} (${prop.appto}) - ${prop.docs.length} cuenta(s)`;
                 select.appendChild(option);
             });
-            
-            this.renderListaCompleta(propietarios);
+            // Llenar select año
+            const anioSel = document.getElementById('select-anio-cobro');
+            const anios = [...new Set(this.allDocs.map(d => {
+                const f = d.fecha_emision || d.fecha_generacion || d.created_at;
+                return f ? new Date(f).getFullYear() : null;
+            }).filter(Boolean))].sort((a,b)=>b-a);
+            anioSel.innerHTML = '<option value="">Todos</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+            // no mostrar listado hasta elegir propietario
+            document.getElementById('docs-por-propietario').innerHTML = '<p class="text-center" style="color:#888;">Seleccione un propietario para ver sus cuentas de cobro</p>';
         } catch(e) { window.NassauApp.showToast('Error cargando documentos: '+e.message, 'error'); } 
         finally { window.NassauApp.showLoading(false); }
     },
@@ -93,31 +108,23 @@ window.NassauDocumentos = {
      },
      filtrarPorPropietario() {
          const propId = document.getElementById('select-propietario').value;
+         const anioFiltro = document.getElementById('select-anio-cobro')?.value || '';
          const container = document.getElementById('docs-por-propietario');
-         
          if (!propId) {
-             // Mostrar todos agrupados
-             const propietarios = {};
-             this.allDocs.forEach(d => {
-                 const pid = d.propietario_id;
-                 const propNombre = d.propietario_nombre || d.nombre_propietario || 'Sin nombre';
-                 const propApto = d.propietario_apto || d.apartamento || '';
-                 if (!propietarios[pid]) {
-                     propietarios[pid] = { nombre: propNombre, apto: propApto, docs: [] };
-                 }
-                 propietarios[pid].docs.push(d);
-             });
-             this.renderListaCompleta(propietarios);
+             container.innerHTML = '<p class="text-center" style="color:#888;">Seleccione un propietario para ver sus cuentas de cobro</p>';
              return;
          }
          
-         // Filtrar por propietario seleccionado
          const prop = this.allDocs.find(d => d.propietario_id === propId);
          const propNombre = prop ? (prop.propietario_nombre || prop.nombre_propietario) : '';
          const propApto = prop ? (prop.propietario_apto || prop.apartamento) : '';
-          const propEmail = prop ? (prop.propietario?.email || '') : '';
-          const propTelefono = prop ? (prop.propietario?.telefono || '') : '';
-          const docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
+          let docsFiltrados = this.allDocs.filter(d => d.propietario_id === propId);
+          if (anioFiltro) docsFiltrados = docsFiltrados.filter(d => {
+              const f = d.fecha_emision || d.fecha_generacion || d.created_at;
+              return f && String(new Date(f).getFullYear()) === String(anioFiltro);
+          });
+          // ordenar por fecha ascendente (más antigua primero)
+          docsFiltrados.sort((a,b) => new Date(a.fecha_emision || a.fecha_generacion || a.created_at) - new Date(b.fecha_emision || b.fecha_generacion || b.created_at));
           
           let html = `
          <div style="margin-bottom: 1.5rem; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
