@@ -189,14 +189,14 @@ window.NassauPropietarios = {
                 </div>
                 <div style="border:1px solid #333; padding:12px; border-radius:8px; margin:12px 0; background:#111; color:#fff;">
                     <p style="font-weight:bold; margin:0 0 10px 0; text-align:left;">Inmuebles - coeficientes</p>
-                    <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-start; width:100%;">
-                        <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start; width:100%; margin:0;"><input type="checkbox" id="prop-has-apto" ${hasApto ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('apto')" style="margin:0;"> Apto</label>
+                    <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-start; width:100%; padding:0;">
+                        <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start; width:100%; margin:0; padding:0; text-align:left;"><input type="checkbox" id="prop-has-apto" ${hasApto ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('apto')" style="margin:0 8px 0 0; padding:0;"> Apto</label>
                         <div id="prop-apto-fields" style="display:${hasApto ? 'flex' : 'none'}; gap:10px; flex-wrap:wrap; margin-left:22px; align-items:end;">
                             <div class="form-group" style="margin:0; width:220px;"><label style="color:#fff; text-align:left; display:block; margin-bottom:4px;">Coef. Apto %</label><input type="number" step="0.0001" min="0" max="100" id="prop-coef-apto" value="${coefApto}" placeholder="Ej: 0.85" oninput="window.NassauPropietarios.calcCuotaPreview()" style="background:#000; color:#fff; border:1px solid #444;"></div>
                         </div>
                     </div>
-                    <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; width:100%;">
-                        <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start; width:100%; margin:0;"><input type="checkbox" id="prop-has-celda" ${hasCelda ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('celda')" style="margin:0;"> Celda</label>
+                    <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; width:100%; padding:0;">
+                        <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start; width:100%; margin:0; padding:0; text-align:left;"><input type="checkbox" id="prop-has-celda" ${hasCelda ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('celda')" style="margin:0 8px 0 0; padding:0;"> Celda</label>
                         <div id="prop-celda-fields" style="display:${hasCelda ? 'flex' : 'none'}; gap:10px; flex-wrap:wrap; margin-left:22px; align-items:end;">
                             <div class="form-group" style="margin:0;"><label style="color:#fff; text-align:left; display:block; margin-bottom:4px;">No. Celda</label><input type="text" id="prop-celda" value="${p.no_celda || ''}" placeholder="Ej: 12" style="background:#000; color:#fff; border:1px solid #444;"></div>
                             <div class="form-group" style="margin:0;"><label style="color:#fff; text-align:left; display:block; margin-bottom:4px;">Coef. Celda %</label><input type="number" step="0.0001" min="0" max="100" id="prop-coef-celda" value="${coefCelda}" placeholder="0" oninput="window.NassauPropietarios.calcCuotaPreview()" style="background:#000; color:#fff; border:1px solid #444;"></div>
