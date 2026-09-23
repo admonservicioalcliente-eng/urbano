@@ -39,16 +39,23 @@ export async function handleGetOne(request, env, user, id) {
 }
 
 function calcCuota(presupuesto, prop) {
-  const cp = parseFloat(prop.coef_apto) || 0;
-  const cc = prop.has_celda ? (parseFloat(prop.coef_celda) || 0) : 0;
-  const cq = prop.has_cuarto_util ? (parseFloat(prop.coef_cuarto_util) || 0) : 0;
-  const suma = cp + cc + cq;
+  const hasCelda = !!prop.has_celda;
+  const hasCuarto = !!prop.has_cuarto_util;
+  const hasApto = !!prop.has_apto || parseFloat(prop.coef_apto) > 0 || (!hasCelda && !hasCuarto);
+  const valC = hasCelda ? (parseFloat(prop.valor_celda) || 0) : 0;
+  const valQ = hasCuarto ? (parseFloat(prop.valor_cuarto_util) || 0) : 0;
+  const coefApto = hasApto ? (parseFloat(prop.coef_apto) || 0) : 0;
+  // exclusivo: si hay valor >0, coef de ese inmueble se ignora
+  const coefCelda = hasCelda && valC === 0 ? (parseFloat(prop.coef_celda) || 0) : 0;
+  const coefCuarto = hasCuarto && valQ === 0 ? (parseFloat(prop.coef_cuarto_util) || 0) : 0;
+  const cp = hasApto ? coefApto : 0;
+  const suma = cp + coefCelda + coefCuarto;
   let base = 0;
   if (suma > 0 && presupuesto > 0) base = presupuesto * suma / 100;
+  else if (!hasCelda && !hasCuarto && !hasApto) base = parseFloat(prop.cuota_admon) || 0;
+  else if (suma === 0 && presupuesto > 0) base = 0;
   else base = parseFloat(prop.cuota_admon) || 0;
-  const vc = prop.has_celda ? (parseFloat(prop.valor_celda) || 0) : 0;
-  const vq = prop.has_cuarto_util ? (parseFloat(prop.valor_cuarto_util) || 0) : 0;
-  return Math.round((base + vc + vq) * 100) / 100;
+  return Math.round((base + valC + valQ) * 100) / 100;
 }
 
 export async function handleCreate(request, env, user) {
@@ -285,14 +292,21 @@ async function sembrarEstadosInicio(env, prop) {
     );
     const presupuestoAnio = (params.length && parseFloat(params[0].cuota_admon) > 0) ? parseFloat(params[0].cuota_admon) : null;
     let cuota;
-    if (presupuestoAnio !== null && ((parseFloat(prop.coef_apto) || 0) > 0 || prop.has_celda || prop.has_cuarto_util)) {
-      cuota = calcCuota(presupuestoAnio, prop);
-      // desglose
-      const cp = parseFloat(prop.coef_apto)||0, cc = prop.has_celda ? parseFloat(prop.coef_celda)||0 :0, cq = prop.has_cuarto_util ? parseFloat(prop.coef_cuarto_util)||0:0;
-      const vApto = presupuestoAnio * cp /100;
-      const vCelda = prop.has_celda ? (presupuestoAnio * cc /100 + (parseFloat(prop.valor_celda)||0)) : 0;
-      const vCuarto = prop.has_cuarto_util ? (presupuestoAnio * cq /100 + (parseFloat(prop.valor_cuarto_util)||0)) : 0;
-      // se guardará desglose abajo en insert si columnas existen
+    const hasA = !!(parseFloat(prop.coef_apto)>0);
+    const hasC = !!prop.has_celda;
+    const hasQ = !!prop.has_cuarto_util;
+    const valC_ = hasC ? parseFloat(prop.valor_celda)||0 : 0;
+    const valQ_ = hasQ ? parseFloat(prop.valor_cuarto_util)||0 : 0;
+    const useCoefC = hasC && valC_ === 0;
+    const useCoefQ = hasQ && valQ_ === 0;
+    if (presupuestoAnio !== null && (hasA || hasC || hasQ)) {
+      cuota = calcCuota(presupuestoAnio, { ...prop, has_apto: hasA });
+      const cp = hasA ? parseFloat(prop.coef_apto)||0 : 0;
+      const cc = useCoefC ? parseFloat(prop.coef_celda)||0 : 0;
+      const cq = useCoefQ ? parseFloat(prop.coef_cuarto_util)||0 : 0;
+      const vApto = hasA ? presupuestoAnio * cp /100 : 0;
+      const vCelda = hasC ? (valC_ > 0 ? valC_ : presupuestoAnio * cc /100) : 0;
+      const vCuarto = hasQ ? (valQ_ > 0 ? valQ_ : presupuestoAnio * cq /100) : 0;
       prop._desglose = { vApto: Math.round(vApto*100)/100, vCelda: Math.round(vCelda*100)/100, vCuarto: Math.round(vCuarto*100)/100 };
     } else {
       cuota = parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || 0;

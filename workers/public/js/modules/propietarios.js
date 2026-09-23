@@ -103,23 +103,34 @@ window.NassauPropietarios = {
             presupuesto = parseFloat(actual?.cuota_admon) || 0;
         } catch {}
         const hasApto = document.getElementById('prop-has-apto')?.checked;
-        const coefApto = hasApto ? (parseFloat(document.getElementById('prop-coef-apto')?.value) || 0) : 0;
+        const coefAptoRaw = hasApto ? (parseFloat(document.getElementById('prop-coef-apto')?.value) || 0) : 0;
         const hasCelda = document.getElementById('prop-has-celda')?.checked;
-        const coefCelda = hasCelda ? (parseFloat(document.getElementById('prop-coef-celda')?.value) || 0) : 0;
-        const valCelda = hasCelda ? (parseFloat(document.getElementById('prop-valor-celda')?.value) || 0) : 0;
+        const valCeldaRaw = hasCelda ? (parseFloat(document.getElementById('prop-valor-celda')?.value) || 0) : 0;
+        const coefCeldaRaw = hasCelda && valCeldaRaw === 0 ? (parseFloat(document.getElementById('prop-coef-celda')?.value) || 0) : 0;
         const hasCuarto = document.getElementById('prop-has-cuarto')?.checked;
-        const coefCuarto = hasCuarto ? (parseFloat(document.getElementById('prop-coef-cuarto')?.value) || 0) : 0;
-        const valCuarto = hasCuarto ? (parseFloat(document.getElementById('prop-valor-cuarto')?.value) || 0) : 0;
+        const valCuartoRaw = hasCuarto ? (parseFloat(document.getElementById('prop-valor-cuarto')?.value) || 0) : 0;
+        const coefCuartoRaw = hasCuarto && valCuartoRaw === 0 ? (parseFloat(document.getElementById('prop-coef-cuarto')?.value) || 0) : 0;
+        // desactivar coef si hay valor
+        const coefCeldaInput = document.getElementById('prop-coef-celda');
+        const coefCuartoInput = document.getElementById('prop-coef-cuarto');
+        if (coefCeldaInput) { coefCeldaInput.disabled = valCeldaRaw > 0; coefCeldaInput.style.opacity = valCeldaRaw > 0 ? '0.5' : '1'; if (valCeldaRaw > 0) coefCeldaInput.value = ''; }
+        if (coefCuartoInput) { coefCuartoInput.disabled = valCuartoRaw > 0; coefCuartoInput.style.opacity = valCuartoRaw > 0 ? '0.5' : '1'; if (valCuartoRaw > 0) coefCuartoInput.value = ''; }
+        const coefApto = coefAptoRaw, coefCelda = coefCeldaRaw, coefCuarto = coefCuartoRaw;
+        const valCelda = valCeldaRaw, valCuarto = valCuartoRaw;
         const suma = coefApto + coefCelda + coefCuarto;
         const cuotaManual = parseFloat(manualInput?.value) || 0;
-        let base = 0, vApto=0, vCelda=0, vCuarto=0, total=0;
-        const tieneCoef = hasApto || hasCelda || hasCuarto;
-        if (tieneCoef && presupuesto > 0 && suma > 0) {
-            vApto = hasApto ? presupuesto * coefApto / 100 : 0;
-            vCelda = hasCelda ? (presupuesto * coefCelda / 100 + valCelda) : 0;
-            vCuarto = hasCuarto ? (presupuesto * coefCuarto / 100 + valCuarto) : 0;
-            base = presupuesto * suma / 100;
-            total = base + valCelda + valCuarto;
+        let vApto=0, vCelda=0, vCuarto=0, total=0;
+        const tieneCoef = hasApto || (hasCelda && (coefCelda>0 || valCelda>0)) || (hasCuarto && (coefCuarto>0 || valCuarto>0));
+        if (tieneCoef) {
+            if (valCelda>0 || valCuarto>0 || suma>0) {
+                vApto = hasApto && presupuesto>0 ? presupuesto * coefApto / 100 : 0;
+                vCelda = hasCelda ? (valCelda>0 ? valCelda : (presupuesto>0 ? presupuesto * coefCelda /100 : 0)) : 0;
+                vCuarto = hasCuarto ? (valCuarto>0 ? valCuarto : (presupuesto>0 ? presupuesto * coefCuarto /100 : 0)) : 0;
+                total = vApto + vCelda + vCuarto;
+                if (total===0) total = cuotaManual || 0;
+            } else {
+                total = cuotaManual || 0; vApto = total;
+            }
         } else {
             total = cuotaManual || parseFloat(hidden?.value) || 0;
             vApto = total;

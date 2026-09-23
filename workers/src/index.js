@@ -39,6 +39,39 @@ export default {
     try {
       await ensureMigrations(env);
 
+      if (path === '/api/admin/reproyectar' && method === 'POST') {
+        const auth2 = await authMiddleware(request, env);
+        if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
+        if (auth2.user.rol !== 'superadmin') return errorResponse('Solo superadmin', 403, env);
+        const { query } = await import('./db.js');
+        const { reconciliarPagos } = await import('./reconciliar.js');
+        // backup
+        await query(env, `CREATE TABLE IF NOT EXISTS estados_backup_202509 AS SELECT * FROM estados_cuenta WHERE 1=0`);
+        await query(env, `INSERT INTO estados_backup_202509 SELECT * FROM estados_cuenta WHERE propietario_id IN (SELECT id FROM propietarios WHERE estado != 'inactivo')`);
+        // borrar todo (incluido cerrado) para reproyectar con coef - solo valor propietario, no presupuesto default
+        await query(env, `DELETE FROM estados_cuenta WHERE propietario_id IN (SELECT id FROM propietarios WHERE estado != 'inactivo')`);
+        const urbs = await query(env, `SELECT id FROM urbanizaciones WHERE estado != 'rechazada'`);
+        const hoy = new Date(); const anioAct = hoy.getFullYear(); const mesAct = hoy.getMonth()+1;
+        let creadas = 0;
+        for (const u of urbs) {
+          const pars = await query(env, `SELECT anio FROM parametros_anio WHERE urbanizacion_id=$1 ORDER BY anio`, [u.id]);
+          let anios = pars.map(r=>r.anio);
+          if (!anios.length) anios = [anioAct];
+          for (const anio of anios) {
+            const hastaMes = anio === anioAct ? mesAct : 12;
+            for (let m=1; m<=hastaMes; m++) {
+              try { const r = await query(env, `SELECT generar_cuotas_mes($1,$2,$3) AS creadas`, [u.id, anio, m]); creadas += r[0]?.creadas||0; } catch(e) { console.error('gen', anio, m, e.message); }
+            }
+          }
+        }
+        // respetar mes_inicio/anio_inicio para morosos: borrar meses generados antes de su inicio
+        await query(env, `DELETE FROM estados_cuenta ec USING propietarios p WHERE ec.propietario_id = p.id AND p.estado = 'moroso' AND p.mes_inicio IS NOT NULL AND p.anio_inicio IS NOT NULL AND (ec.anio < p.anio_inicio OR (ec.anio = p.anio_inicio AND ec.mes < p.mes_inicio))`);
+        // reconciliar pagos por propietario
+        const props = await query(env, `SELECT id FROM propietarios WHERE estado != 'inactivo'`);
+        for (const p of props) { try { await reconciliarPagos(env, p.id); await query(env, `SELECT actualizar_intereses_propietario($1)`, [p.id]); } catch(e){} }
+        return jsonResponse({ ok:true, creadas, propietarios: props.length }, 200, env);
+      }
+
       // Public routes
       if (path === '/api/auth/login' && method === 'POST') {
         const res = await authHandler.handleLogin(request, env);

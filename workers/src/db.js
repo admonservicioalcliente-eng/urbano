@@ -125,12 +125,21 @@ export async function ensureMigrations(env) {
                      IF v_mes_actual_idx >= v_inicio_mes_idx AND v_mes_actual_idx <= v_fin_mes_idx THEN v_cuota_extra:=v_params.cuota_extra; END IF;
                  END IF;
                   v_presupuesto:=COALESCE(v_params.cuota_admon,0);
-                  v_sum_coef:=COALESCE(v_prop.coef_apto,0) + CASE WHEN COALESCE(v_prop.has_celda,false) THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
+                  -- exclusivo: si valor>0 se ignora coef de ese inmueble
+                  v_sum_coef:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 THEN COALESCE(v_prop.coef_apto,0) ELSE 0 END
+                    + CASE WHEN COALESCE(v_prop.has_celda,false) AND COALESCE(v_prop.valor_celda,0)=0 THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END
+                    + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) AND COALESCE(v_prop.valor_cuarto_util,0)=0 THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
                    IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
-                      v_vapto:=ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2);
-                      v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100 + COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
-                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100 + COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
-                      v_total_cuota:=ROUND(v_presupuesto * v_sum_coef/100 + COALESCE(v_prop.valor_celda,0)*CASE WHEN COALESCE(v_prop.has_celda,false) THEN 1 ELSE 0 END + COALESCE(v_prop.valor_cuarto_util,0)*CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN 1 ELSE 0 END,2);
+                      v_vapto:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2) ELSE 0 END;
+                      v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN CASE WHEN COALESCE(v_prop.valor_celda,0)>0 THEN ROUND(COALESCE(v_prop.valor_celda,0),2) ELSE ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100,2) END ELSE 0 END;
+                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN CASE WHEN COALESCE(v_prop.valor_cuarto_util,0)>0 THEN ROUND(COALESCE(v_prop.valor_cuarto_util,0),2) ELSE ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100,2) END ELSE 0 END;
+                      v_total_cuota:=ROUND(COALESCE(v_vapto,0) + COALESCE(v_vcelda,0) + COALESCE(v_vcuarto,0),2);
+                   ELSIF COALESCE(v_prop.valor_celda,0)>0 OR COALESCE(v_prop.valor_cuarto_util,0)>0 THEN
+                      v_vapto:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 AND v_presupuesto>0 THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2) ELSE 0 END;
+                      v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) AND COALESCE(v_prop.valor_celda,0)>0 THEN ROUND(COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
+                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) AND COALESCE(v_prop.valor_cuarto_util,0)>0 THEN ROUND(COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
+                      v_total_cuota:=ROUND(COALESCE(v_vapto,0) + COALESCE(v_vcelda,0) + COALESCE(v_vcuarto,0),2);
+                      IF v_total_cuota=0 THEN v_total_cuota:=COALESCE(v_prop.cuota_total, v_prop.cuota_admon, 0); END IF;
                    ELSE
                        v_total_cuota:=COALESCE(v_prop.cuota_total, v_prop.cuota_admon, 0);
                        v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
