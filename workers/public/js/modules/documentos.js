@@ -518,12 +518,23 @@ window.NassauDocumentos = {
             doc.text('Cuota de administración mensual:', M, y);
             y += 5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-            const mesActualLabel = mesNames[new Date().getMonth() + 1] || '';
-            const desgloseActual = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
-            const totalDesglose = desgloseActual ? (Number(desgloseActual.valor_apto||0)+Number(desgloseActual.valor_celda||0)+Number(desgloseActual.valor_cuarto_util||0)) : 0;
-            const cuotaActualMostrar = Number(t.cuota_mes_actual) || totalDesglose || Number(t.cuota_admon) || 0;
+            const sortedPeriods = [...(detalle?.periodos_pendientes||[])].sort((a,b)=> (a.anio - b.anio) || (a.mes - b.mes));
+            const lastP = sortedPeriods.length ? sortedPeriods[sortedPeriods.length-1] : null;
+            const mesActualLabel = mesNames[lastP?.mes || new Date().getMonth()+1] || '';
+            const anioActualLabel = lastP?.anio || new Date().getFullYear();
+            // valor del mes actual = pago_actual del último periodo (con desglose)
+            let cuotaActualMostrar = 0;
+            if (lastP) {
+                const hasDesLast = (Number(lastP.valor_apto)||0)+(Number(lastP.valor_celda)||0)+(Number(lastP.valor_cuarto_util)||0) > 0;
+                cuotaActualMostrar = hasDesLast ? ((Number(lastP.valor_apto)||0)+(Number(lastP.valor_celda)||0)+(Number(lastP.valor_cuarto_util)||0)) : Number(lastP.pago_actual||0);
+            }
+            if (!cuotaActualMostrar) {
+                const desgloseActual = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
+                const totalDesglose = desgloseActual ? (Number(desgloseActual.valor_apto||0)+Number(desgloseActual.valor_celda||0)+Number(desgloseActual.valor_cuarto_util||0)) : 0;
+                cuotaActualMostrar = Number(t.cuota_mes_actual) || totalDesglose || Number(t.cuota_admon) || 0;
+            }
             const saldoMostrar = Number(t.total) || Number(t.total_deuda) || cuotaActualMostrar;
-            doc.text(`Cuota ${mesActualLabel} ${new Date().getFullYear()}:`, M, y);
+            doc.text(`Cuota ${mesActualLabel} ${anioActualLabel}:`, M, y);
             doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
             doc.text(`$${cuotaActualMostrar.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
             y += 6;
