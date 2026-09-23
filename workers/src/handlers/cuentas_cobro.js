@@ -185,8 +185,7 @@ export async function handleCreate(request, env, user) {
     }
   }
 
-  let totalCuota = 0, totalInteres = 0, totalSaldoFavor = 0;
-  // para total correcto, tomar el último mes abierto como total acumulado, no sumar saldos
+  let totalCuota = 0, totalInteres = 0, totalSaldoAnt = 0, totalSaldoFavor = 0;
   let lastOpenTotal = 0;
   for (const ec of ecs) {
     if (ec.cerrado) continue;
