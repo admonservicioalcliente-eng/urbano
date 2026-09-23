@@ -95,9 +95,13 @@ button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-weight:
     .modal-body { padding: 1rem; }
 }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: orange; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #ff8c00; }
+* { scrollbar-width: thin; scrollbar-color: orange #111; }
+.table-container::-webkit-scrollbar-thumb { background: orange; }
+#modal-container::-webkit-scrollbar-thumb { background: orange; }
+#prop-form::-webkit-scrollbar-thumb { background: orange; }
 
 /* Toggle Switch */
 .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; cursor: pointer; }
