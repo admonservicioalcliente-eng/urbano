@@ -80,16 +80,13 @@ export async function handleGetByPropietario(request, env, user) {
     }
   }
 
-  // Totales reales de TODOS los estados del propietario (todos los años):
-  // cargos causados mes a mes MENOS los abonos/pagos aplicados (los abonos del
-  // mes actual se aplican a la deuda más antigua y se descuentan del total).
   const totals = await query(env,
     `SELECT
-       COALESCE(SUM(pago_actual + saldo_anterior + intereses), 0) AS total_cargos,
+       COALESCE(SUM(pago_actual + intereses), 0) AS total_cargos,
        COALESCE(SUM(saldo_favor), 0) AS total_saldo_favor,
        COUNT(CASE WHEN cerrado = false AND total_deuda > 0 THEN 1 END) AS meses_pendientes
      FROM estados_cuenta
-     WHERE propietario_id = $1`,
+     WHERE propietario_id = $1 AND cerrado = false`,
     [propId]
   );
   let totalCargos = parseFloat(totals[0].total_cargos) || 0;
@@ -162,9 +159,8 @@ export async function handleGetDashboard(request, env, user) {
     [urbId, mesActual, anioActual]
   );
 
-  // 3. Deuda total acumulada en la urbanización (cargos netos menos pagos)
   const deuda = await query(env,
-    `SELECT COALESCE(SUM(ec.pago_actual + ec.saldo_anterior + ec.intereses - ec.saldo_favor), 0) AS deuda_neta
+    `SELECT COALESCE(SUM(ec.pago_actual + ec.intereses - ec.saldo_favor), 0) AS deuda_neta
      FROM estados_cuenta ec
      JOIN propietarios p ON p.id = ec.propietario_id
      WHERE p.urbanizacion_id = $1 AND ec.cerrado = false`,
