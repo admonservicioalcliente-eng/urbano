@@ -18,7 +18,7 @@ export async function handleGetAll(request, env, user) {
   const params = [urbId];
 
   if (search) {
-    sql += ` AND (p.nombre_propietario ILIKE $2 OR p.apartamento ILIKE $2 OR p.no_celda ILIKE $2)`;
+    sql += ` AND (p.nombre_propietario ILIKE $2 OR p.apartamento ILIKE $2 OR p.no_celda ILIKE $2 OR p.no_cuarto_util ILIKE $2)`;
     params.push(`%${search}%`);
   }
 
@@ -62,7 +62,7 @@ export async function handleCreate(request, env, user) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
+  const { nombre_propietario, apartamento, no_celda, no_cuarto_util, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
   if (!nombre_propietario || !apartamento) return err(400, 'Nombre y Apartamento son requeridos');
 
   if (estado === 'moroso' || estado === 'abono_inicial') {
@@ -103,16 +103,18 @@ export async function handleCreate(request, env, user) {
   // asegurar columna cuota_total exista
   try { await query(env, `SELECT cuota_total FROM propietarios LIMIT 0`); } catch { await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`); }
 
+  // asegurar no_cuarto_util
+  try { await query(env, `SELECT no_cuarto_util FROM propietarios LIMIT 0`); } catch { await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS no_cuarto_util VARCHAR(30)`); }
   try {
     const rows = await query(env,
       `INSERT INTO propietarios (
-        urbanizacion_id, nombre_propietario, apartamento, no_celda, 
+        urbanizacion_id, nombre_propietario, apartamento, no_celda, no_cuarto_util,
         cuota_admon, cuota_total, estado, numero_cuenta, modo_pago, telefono, email, notas,
         prefijo, mes_inicio, anio_inicio, abono_inicial,
         coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
       [
-        urbId, nombre_propietario, apartamento, no_celda || null, 
+        urbId, nombre_propietario, apartamento, no_celda || null, no_cuarto_util || null,
         cuotaManual, cuotaTotal, estado || 'activo', numero_cuenta || null, modo_pago || 'efectivo',
         telefono || null, email || null, notas || null,
         prefijo || null, mes_inicio || null, anio_inicio || null, parseFloat(abono_inicial) || 0,
@@ -148,7 +150,7 @@ export async function handleUpdate(request, env, user, id) {
     return err(403, 'Acceso denegado');
   }
 
-  const { nombre_propietario, apartamento, no_celda, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
+  const { nombre_propietario, apartamento, no_celda, no_cuarto_util, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
 
   // asegurar columnas
   try { await query(env, `SELECT coef_apto FROM propietarios LIMIT 0`); } catch {
@@ -199,33 +201,36 @@ export async function handleUpdate(request, env, user, id) {
     } catch {}
   }
 
+  // asegurar no_cuarto_util en update
+  try { await query(env, `SELECT no_cuarto_util FROM propietarios LIMIT 0`); } catch { await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS no_cuarto_util VARCHAR(30)`); }
   const updateRows = await query(env,
     `UPDATE propietarios SET
       nombre_propietario = COALESCE($1, nombre_propietario),
       apartamento = COALESCE($2, apartamento),
       no_celda = $3,
-      cuota_admon = COALESCE($4, cuota_admon),
-      cuota_total = COALESCE($5, cuota_total),
-      estado = COALESCE($6, estado),
-      numero_cuenta = $7,
-      modo_pago = COALESCE($8, modo_pago),
-      telefono = $9,
-      email = $10,
-      notas = $11,
-      prefijo = $12,
-      mes_inicio = $13,
-      anio_inicio = $14,
-      abono_inicial = COALESCE($15, abono_inicial),
-      coef_apto = COALESCE($16, coef_apto),
-      coef_celda = COALESCE($17, coef_celda),
-      coef_cuarto_util = COALESCE($18, coef_cuarto_util),
-      valor_celda = COALESCE($19, valor_celda),
-      valor_cuarto_util = COALESCE($20, valor_cuarto_util),
-      has_celda = COALESCE($21, has_celda),
-      has_cuarto_util = COALESCE($22, has_cuarto_util),
+      no_cuarto_util = $4,
+      cuota_admon = COALESCE($5, cuota_admon),
+      cuota_total = COALESCE($6, cuota_total),
+      estado = COALESCE($7, estado),
+      numero_cuenta = $8,
+      modo_pago = COALESCE($9, modo_pago),
+      telefono = $10,
+      email = $11,
+      notas = $12,
+      prefijo = $13,
+      mes_inicio = $14,
+      anio_inicio = $15,
+      abono_inicial = COALESCE($16, abono_inicial),
+      coef_apto = COALESCE($17, coef_apto),
+      coef_celda = COALESCE($18, coef_celda),
+      coef_cuarto_util = COALESCE($19, coef_cuarto_util),
+      valor_celda = COALESCE($20, valor_celda),
+      valor_cuarto_util = COALESCE($21, valor_cuarto_util),
+      has_celda = COALESCE($22, has_celda),
+      has_cuarto_util = COALESCE($23, has_cuarto_util),
       updated_at = NOW()
-    WHERE id = $23 RETURNING *`,
-    [nombre_propietario || null, apartamento || null, no_celda || null, cuotaManualUpd === undefined ? null : (isNaN(parseFloat(cuotaManualUpd)) ? 0 : parseFloat(cuotaManualUpd)), cuotaTotalUpd === undefined ? null : (isNaN(parseFloat(cuotaTotalUpd)) ? 0 : parseFloat(cuotaTotalUpd)), estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
+    WHERE id = $24 RETURNING *`,
+    [nombre_propietario || null, apartamento || null, no_celda || null, no_cuarto_util || null, cuotaManualUpd === undefined ? null : (isNaN(parseFloat(cuotaManualUpd)) ? 0 : parseFloat(cuotaManualUpd)), cuotaTotalUpd === undefined ? null : (isNaN(parseFloat(cuotaTotalUpd)) ? 0 : parseFloat(cuotaTotalUpd)), estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
      coef_apto === undefined ? null : parseFloat(coef_apto) || 0,
      coef_celda === undefined ? null : parseFloat(coef_celda) || 0,
      coef_cuarto_util === undefined ? null : parseFloat(coef_cuarto_util) || 0,

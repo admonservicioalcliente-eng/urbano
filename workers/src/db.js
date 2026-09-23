@@ -60,6 +60,7 @@ export async function ensureMigrations(env) {
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS no_cuarto_util VARCHAR(30)`);
           await sql.unsafe(`UPDATE propietarios SET cuota_total = cuota_admon WHERE cuota_total IS NULL OR cuota_total = 0`);
           // Estados de cuenta: desglose por item
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);

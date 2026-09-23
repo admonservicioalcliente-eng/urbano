@@ -165,21 +165,23 @@ window.NassauPropietarios = {
         const mostrarInicio = (p.estado === 'moroso' || p.estado === 'abono_inicial');
         const mostrarAbono = p.estado === 'abono_inicial';
         const hasCelda = !!(p.has_celda || p.no_celda);
-        const hasCuarto = !!p.has_cuarto_util;
+        const hasCuarto = !!(p.has_cuarto_util || p.no_cuarto_util);
         const hasApto = !!(parseFloat(p.coef_apto) > 0);
         const coefApto = p.coef_apto ?? '';
         const coefCelda = p.coef_celda ?? '';
         const coefCuarto = p.coef_cuarto_util ?? '';
         const valCelda = p.valor_celda ?? '';
         const valCuarto = p.valor_cuarto_util ?? '';
+        const noCuarto = p.no_cuarto_util ?? '';
         const cuotaManual = p.cuota_admon != null && p.cuota_admon !== '' ? p.cuota_admon : '';
         const cuotaTotal = p.cuota_total != null && p.cuota_total !== '' ? p.cuota_total : '';
         return `
-            <form id="prop-form" onsubmit="window.NassauPropietarios.savePropietario(event)">
+            <style>#prop-form{scrollbar-width:thin; scrollbar-color: orange #111;} #prop-form::-webkit-scrollbar{width:8px} #prop-form::-webkit-scrollbar-thumb{background:orange; border-radius:4px} #prop-form::-webkit-scrollbar-track{background:#111}</style>
+            <form id="prop-form" onsubmit="window.NassauPropietarios.savePropietario(event)" style="max-height:70vh; overflow-y:auto; padding-right:6px;">
                 <div class="form-group"><label>Nombre Completo</label><input type="text" id="prop-nombre" value="${p.nombre_propietario || ''}" required></div>
                 <div class="form-row">
                     <div class="form-group"><label>Apartamento</label><input type="text" id="prop-apto" value="${p.apartamento || ''}" required></div>
-                    <div class="form-group"><label>Prefijo Documento</label><input type="text" id="prop-prefijo" value="${p.prefijo || ''}" maxlength="10" placeholder="Ej: NAS"></div>
+                    <div class="form-group"><label>Prefijo Documento Pago</label><input type="text" id="prop-prefijo" value="${p.prefijo || ''}" maxlength="10" placeholder="Ej: NAS"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>Valor Cuota Admon $</label><input type="number" step="1000" min="0" id="prop-cuota-admon" value="${cuotaManual}" placeholder="Ej: 250000" oninput="window.NassauPropietarios.calcCuotaPreview()"></div>
@@ -204,6 +206,7 @@ window.NassauPropietarios = {
                     <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; align-items:flex-start;">
                         <label style="display:flex; align-items:center; gap:8px; justify-content:flex-start;"><input type="checkbox" id="prop-has-cuarto" ${hasCuarto ? 'checked' : ''} onchange="window.NassauPropietarios.toggleInmueble('cuarto')"> Cuarto Útil</label>
                         <div id="prop-cuarto-fields" style="display:${hasCuarto ? 'flex' : 'none'}; gap:10px; flex-wrap:wrap; margin-left:22px; align-items:end;">
+                            <div class="form-group" style="margin:0;"><label style="color:#fff; text-align:left; display:block;">No. Cuarto Útil</label><input type="text" id="prop-cuarto-num" value="${noCuarto}" placeholder="Ej: 5" style="background:#000; color:#fff; border:1px solid #444;"></div>
                             <div class="form-group" style="margin:0;"><label style="color:#fff; text-align:left; display:block;">Coef. Cuarto %</label><input type="number" step="0.0001" min="0" max="100" id="prop-coef-cuarto" value="${coefCuarto}" placeholder="0" oninput="window.NassauPropietarios.calcCuotaPreview()" style="background:#000; color:#fff; border:1px solid #444;"></div>
                             <div class="form-group" style="margin:0;"><label style="color:#fff; text-align:left; display:block;">Valor Cuarto $</label><input type="number" step="1000" min="0" id="prop-valor-cuarto" value="${valCuarto}" placeholder="0" oninput="window.NassauPropietarios.calcCuotaPreview()" style="background:#000; color:#fff; border:1px solid #444;"></div>
                         </div>
@@ -315,6 +318,7 @@ window.NassauPropietarios = {
             nombre_propietario: document.getElementById('prop-nombre').value.trim(),
             apartamento: document.getElementById('prop-apto').value.trim(),
             no_celda: hasCelda ? (document.getElementById('prop-celda')?.value.trim() || null) : null,
+            no_cuarto_util: hasCuarto ? (document.getElementById('prop-cuarto-num')?.value.trim() || null) : null,
             cuota_admon: cuotaManual,
             cuota_total: cuotaTotal,
             coef_apto: hasApto ? (parseFloat(document.getElementById('prop-coef-apto')?.value) || 0) : 0,
