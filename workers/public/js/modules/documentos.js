@@ -516,8 +516,11 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
             doc.text('SALDO A PAGAR', RIGHT - 12, y, { align: 'right' });
             y += 5;
+            const desgloseActual = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
+            const totalDesglose = desgloseActual ? (Number(desgloseActual.valor_apto||0)+Number(desgloseActual.valor_celda||0)+Number(desgloseActual.valor_cuarto_util||0)) : 0;
+            const cuotaActualMostrar = Number(t.cuota_mes_actual) || totalDesglose || Number(t.cuota_admon) || 0;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-            doc.text(`$${Number(t.cuota_mes_actual || t.cuota_admon || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+            doc.text(`$${cuotaActualMostrar.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
 
             // ── Pie de copia: CONSIGNACIÓN (2 renglones) ─────────────────────────
             const yf = Math.max(b + 100, y + 10);
