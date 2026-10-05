@@ -36,20 +36,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  deploy-pages:
-    name: Deploy Frontend to Cloudflare Pages
-    runs-on: ubuntu-latest
-    needs: deploy-worker
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Deploy Frontend to Cloudflare Pages
-        run: npx wrangler pages deploy frontend --project-name=nassau-admin
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  # Nota: el frontend se sirve desde los Assets del Worker
+  # (wrangler.toml: [assets] directory = "public").
+  # El job de Cloudflare Pages se eliminó: el token de la
+  # cuenta no tiene permisos para la API de Pages (error 10000)
+  # y la carpeta frontend/ es una copia obsoleta de la app.
