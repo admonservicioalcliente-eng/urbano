@@ -1,5 +1,13 @@
 window.NassauConfiguracion = {
-    async renderPage() {
+     toggleHelp(e) {
+         e.stopPropagation();
+         const icon = e.currentTarget;
+         const tip = icon.nextElementSibling;
+         const wasOpen = tip.classList.contains('open');
+         document.querySelectorAll('.help-tip.open').forEach(t => t.classList.remove('open'));
+         if (!wasOpen) tip.classList.add('open');
+     },
+     async renderPage() {
         const html = `
             <div class="header-actions">
                 <h2>Configuración Anual</h2>
@@ -16,10 +24,13 @@ window.NassauConfiguracion = {
                     <tbody></tbody>
                 </table>
             </div>`;
-        document.getElementById('page-config').innerHTML = html;
-        await this.loadConfig();
-    },
-async loadConfig() {
+document.getElementById('page-config').innerHTML = html;
+         document.addEventListener('click', (e) => {
+             document.querySelectorAll('.help-tip.open').forEach(t => t.classList.remove('open'));
+         });
+         await this.loadConfig();
+     },
+     async loadConfig() {
          try {
              window.NassauApp.showLoading(true);
 const params = await window.NassauAPI.apiGet('/parametros');
@@ -151,11 +162,11 @@ const html = `
               <form onsubmit="window.NassauConfiguracion.saveConfig(event)">
                  <div class="form-row">
                      <div class="form-group"><label>Año</label><input type="number" id="conf-anio" required value="${new Date().getFullYear() + 1}"></div>
-                     <div class="form-group"><label>Prefijo Comprobante</label><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
+                     <div class="form-group"><label>Prefijo Comprobante</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 44: Prefijo del comprobante de pago que identifica el documento (ej: NAS, ABN, PGO).</span><input type="text" id="conf-prefijo" required value="NAS" maxlength="10" placeholder="Ej: NAS, ABN, PGO"></div>
                  </div>
                   <div class="form-row">
-                       <div class="form-group"><label>Valor Cuota Presupuesto ($)</label><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
-                       <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
+<div class="form-group"><label>Valor Cuota Presupuesto ($)</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 40: Cuota de administración mensual calculada con base en el presupuesto anual de gastos comunes.</span><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
+                        <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 41: Cuota aprobada por asamblea para gastos extraordinarios.</span><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
                    </div>
                   <div class="form-row" id="conf-cuota-extra-fields" style="display:${cuotaExtraVal > 0 ? '' : 'none'};">
                       <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="${cuotaExtraMes}"></div>
@@ -163,12 +174,12 @@ const html = `
                       <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="${cuotaExtraDur}"></div>
                   </div>
                   <div class="form-row">
-                      <div class="form-group"><label>Tasa Mora (%)</label><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
-                      <div class="form-group"><label>Día Generación</label><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
+<div class="form-group"><label>Tasa Mora (%)</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 42: Tasa de interés moratorio mensual sobre el valor de la cuota impaga.</span><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
+                       <div class="form-group"><label>Día Generación</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 40: Día del mes en que se genera la cuota de administración para ese período.</span><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
                   </div>
                   <div class="form-row">
-                      <div class="form-group"><label>Día Vencimiento</label><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
-                      <div class="form-group"><label>Día Inicio Mora</label><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
+<div class="form-group"><label>Día Vencimiento</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 40: Día límite para pagar la cuota sin que se genere interés moratorio.</span><input type="number" id="conf-venc" required value="5" min="1" max="28"></div>
+                       <div class="form-group"><label>Día Inicio Mora</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 42: Día a partir del cual se empiezan a cobrar intereses de mora sobre la cuota impaga.</span><input type="number" id="conf-mora" required value="6" min="1" max="28"></div>
                   </div>
                  <div class="form-group">
                      <label>Mostrar COPIA en PDF</label>

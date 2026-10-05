@@ -39,6 +39,19 @@ export default {
     try {
       await ensureMigrations(env);
 
+      if (path === '/api/debug/cleanup-estados' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const result = await query(env, `
+          DELETE FROM estados_cuenta ec
+          USING propietarios p
+          WHERE ec.propietario_id = p.id
+            AND p.created_at IS NOT NULL
+            AND (ec.anio < EXTRACT(YEAR FROM p.created_at)
+                 OR (ec.anio = EXTRACT(YEAR FROM p.created_at) AND ec.mes < EXTRACT(MONTH FROM p.created_at)))
+        `);
+        return jsonResponse({ deleted: result.length || result.count || 0 }, 200, env);
+      }
+
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
@@ -70,6 +83,124 @@ export default {
         const props = await query(env, `SELECT id FROM propietarios WHERE estado != 'inactivo'`);
         for (const p of props) { try { await reconciliarPagos(env, p.id); await query(env, `SELECT actualizar_intereses_propietario($1)`, [p.id]); } catch(e){} }
         return jsonResponse({ ok:true, creadas, propietarios: props.length }, 200, env);
+      }
+
+      if (path === '/api/debug/reconciliar' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const { reconciliarPagos } = await import('./reconciliar.js');
+        const propId = url.searchParams.get('propietario_id');
+        if (!propId) return jsonResponse({ error: 'propietario_id requerido' }, 400, env);
+        await reconciliarPagos(env, propId);
+        await query(env, `SELECT actualizar_intereses_propietario($1)`, [propId]);
+        return jsonResponse({ ok: true }, 200, env);
+      }
+
+      if (path === '/api/debug/cleanup-estados' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const result = await query(env, `
+          DELETE FROM estados_cuenta ec
+          USING propietarios p
+          WHERE ec.propietario_id = p.id
+            AND p.created_at IS NOT NULL
+            AND (ec.anio < EXTRACT(YEAR FROM p.created_at)
+                 OR (ec.anio = EXTRACT(YEAR FROM p.created_at) AND ec.mes < EXTRACT(MONTH FROM p.created_at)))
+        `);
+        await query(env, `UPDATE estados_cuenta SET saldo_anterior = 0, intereses = 0 WHERE saldo_anterior > 0`);
+        return jsonResponse({ deleted: result.length || result.count || 0 }, 200, env);
+      }
+
+      if (path === '/api/debug/del-cc' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const urb = url.searchParams.get('urb');
+        if (!urb) return jsonResponse({ error: 'urb requerido' }, 400, env);
+        const result = await query(env, `DELETE FROM cuentas_cobro WHERE urbanizacion_id IN (SELECT id FROM urbanizaciones WHERE nombre ILIKE $1)`, [`%${urb}%`]);
+        return jsonResponse({ deleted: result.length || result.count || 0 }, 200, env);
+      }
+
+      if (path === '/api/debug/reset-saldo' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const result = await query(env, `UPDATE estados_cuenta SET saldo_anterior = 0, intereses = 0 WHERE saldo_anterior > 0`);
+        return jsonResponse({ reset: result.length || result.count || 0 }, 200, env);
+      }
+
+      if (path === '/api/debug/recalc-local' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const props = await query(env, `SELECT p.id, p.coef_local, p.valor_local, p.has_local, p.coef_apto, p.coef_celda, p.coef_cuarto_util, p.valor_celda, p.valor_cuarto_util, p.has_celda, p.has_cuarto_util, p.cuota_total, p.cuota_admon, pa.cuota_admon AS presupuesto FROM propietarios p JOIN parametros_anio pa ON pa.urbanizacion_id = p.urbanizacion_id AND pa.anio = EXTRACT(YEAR FROM NOW()) WHERE p.estado != 'inactivo'`);
+        let updated = 0;
+        for (const p of props) {
+          const hasA = Number(p.coef_apto) > 0;
+          const hasC = !!p.has_celda;
+          const hasQ = !!p.has_cuarto_util;
+          const hasL = !!p.has_local;
+          const presupuesto = Number(p.presupuesto)||0;
+          const vc = hasC ? (Number(p.valor_celda)||0) : 0;
+          const vq = hasQ ? (Number(p.valor_cuarto_util)||0) : 0;
+          const vl = hasL ? (Number(p.valor_local)||0) : 0;
+          const cc = hasC && vc === 0 ? (Number(p.coef_celda)||0) : 0;
+          const cq = hasQ && vq === 0 ? (Number(p.coef_cuarto_util)||0) : 0;
+          const cl = hasL && vl === 0 ? (Number(p.coef_local)||0) : 0;
+          const vApto = hasA && presupuesto > 0 ? Math.round(presupuesto * Number(p.coef_apto) / 100 * 100)/100 : 0;
+          const vCelda = hasC ? (vc > 0 ? vc : (presupuesto > 0 ? Math.round(presupuesto * cc / 100 * 100)/100 : 0)) : 0;
+          const vCuarto = hasQ ? (vq > 0 ? vq : (presupuesto > 0 ? Math.round(presupuesto * cq / 100 * 100)/100 : 0)) : 0;
+          const vLocal = hasL ? (vl > 0 ? vl : (presupuesto > 0 ? Math.round(presupuesto * cl / 100 * 100)/100 : 0)) : 0;
+          const sumDesglose = vApto + vCelda + vCuarto + vLocal;
+          const totalCuota = sumDesglose > 0 ? sumDesglose : Number(p.cuota_total)||Number(p.cuota_admon)||0;
+          await query(env, `UPDATE estados_cuenta SET valor_local = $1, pago_actual = $2, cerrado = false WHERE propietario_id = $3`, [vLocal, totalCuota, p.id]);
+          updated++;
+        }
+        return jsonResponse({ updated }, 200, env);
+      }
+
+      if (path === '/api/debug/gen-cuotas' && method === 'POST') {
+        const { query } = await import('./db.js');
+        const mes = url.searchParams.get('mes') || (new Date().getMonth() + 1);
+        const anio = url.searchParams.get('anio') || new Date().getFullYear();
+        const urbs = await query(env, `SELECT id FROM urbanizaciones WHERE estado = 'admitida'`);
+        let total = 0;
+        for (const u of urbs) {
+          const r = await query(env, `SELECT generar_cuotas_mes($1,$2,$3) AS creadas`, [u.id, anio, mes]);
+          total += r[0]?.creadas || 0;
+        }
+        return jsonResponse({ generated: total }, 200, env);
+      }
+
+      if (path === '/api/debug/pagos' && method === 'GET') {
+        const { query } = await import('./db.js');
+        const propId = url.searchParams.get('propietario_id');
+        if (!propId) return jsonResponse({ error: 'propietario_id requerido' }, 400, env);
+        const pagos = await query(env, `SELECT id, monto, fecha_pago, tipo_pago, comprobante, descripcion, estado_cuenta_id FROM pagos WHERE propietario_id = $1 ORDER BY fecha_pago ASC`, [propId]);
+        return jsonResponse({ pagos }, 200, env);
+      }
+
+      if (path === '/api/debug/pagos' && method === 'GET') {
+        const { query } = await import('./db.js');
+        const propId = url.searchParams.get('propietario_id');
+        if (!propId) return jsonResponse({ error: 'propietario_id requerido' }, 400, env);
+        const pagos = await query(env, `SELECT id, monto, fecha_pago, tipo_pago, comprobante, descripcion, estado_cuenta_id FROM pagos WHERE propietario_id = $1 ORDER BY fecha_pago ASC`, [propId]);
+        return jsonResponse({ pagos }, 200, env);
+      }
+
+      if (path === '/api/debug/prop' && method === 'GET') {
+        const { query } = await import('./db.js');
+        const propId = url.searchParams.get('id');
+        const urbName = url.searchParams.get('urb');
+        const search = url.searchParams.get('search');
+        if (search) {
+          const props = await query(env, `SELECT p.id, p.apartamento, p.nombre_propietario, p.estado, p.mes_inicio, p.anio_inicio, p.created_at, p.cuota_admon, p.cuota_total, p.coef_apto, p.coef_celda, p.coef_cuarto_util, p.coef_local, p.valor_celda, p.valor_cuarto_util, p.valor_local, p.has_celda, p.has_cuarto_util, p.has_local, (SELECT count(*) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS num_estados, (SELECT min(ec.anio || '-' || ec.mes) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS primer_estado, (SELECT max(ec.anio || '-' || ec.mes) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS ultimo_estado FROM propietarios p JOIN urbanizaciones u ON u.id = p.urbanizacion_id WHERE p.nombre_propietario ILIKE $1 ORDER BY p.apartamento`, [`%${search}%`]);
+          return jsonResponse({ propietarios: props }, 200, env);
+        }
+        if (urbName) {
+          const props = await query(env, `SELECT p.id, p.apartamento, p.nombre_propietario, p.estado, p.mes_inicio, p.anio_inicio, p.created_at, p.cuota_admon, p.cuota_total, (SELECT count(*) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS num_estados, (SELECT min(ec.anio || '-' || ec.mes) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS primer_estado, (SELECT max(ec.anio || '-' || ec.mes) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS ultimo_estado FROM propietarios p JOIN urbanizaciones u ON u.id = p.urbanizacion_id WHERE u.nombre ILIKE $1 ORDER BY p.apartamento`, [`%${urbName}%`]);
+          return jsonResponse({ propietarios: props }, 200, env);
+        }
+        if (search) {
+          const props = await query(env, `SELECT p.id, p.apartamento, p.nombre_propietario, p.estado, p.mes_inicio, p.anio_inicio, p.created_at, p.cuota_admon, p.cuota_total, p.coef_apto, p.coef_celda, p.coef_cuarto_util, p.coef_local, p.valor_celda, p.valor_cuarto_util, p.valor_local, p.has_celda, p.has_cuarto_util, p.has_local, (SELECT count(*) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS num_estados, (SELECT min(ec.anio || '-' || ec.mes) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS primer_estado, (SELECT max(ec.anio || '-' || ec.mes) FROM estados_cuenta ec WHERE ec.propietario_id = p.id) AS ultimo_estado FROM propietarios p JOIN urbanizaciones u ON u.id = p.urbanizacion_id WHERE p.nombre_propietario ILIKE $1 ORDER BY p.apartamento`, [`%${search}%`]);
+          return jsonResponse({ propietarios: props }, 200, env);
+        }
+        if (!propId && !urbName) return jsonResponse({ error: 'id, urb o search requerido' }, 400, env);
+        const prop = await query(env, `SELECT id, apartamento, nombre_propietario, estado, mes_inicio, anio_inicio, created_at, cuota_admon, cuota_total FROM propietarios WHERE id = $1`, [propId]);
+        const estados = await query(env, `SELECT id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, cerrado FROM estados_cuenta WHERE propietario_id = $1 ORDER BY anio ASC, mes ASC`, [propId]);
+        return jsonResponse({ propietario: prop[0], estados }, 200, env);
       }
 
       // Public routes
@@ -243,6 +374,7 @@ async scheduled(event, env, ctx) {
 
   async generateMonthlyCuotas(env) {
     const { query } = await import('./db.js');
+    const { reconciliarPagos } = await import('./reconciliar.js');
     const hoy = new Date();
     const anio = hoy.getFullYear();
     const mes = hoy.getMonth() + 1;
@@ -265,6 +397,11 @@ async scheduled(event, env, ctx) {
         } catch (e) {
           console.error(`Error generando cuotas para ${urb.nombre}:`, e.message);
         }
+      }
+      // Reconciliar pagos de todos los propietarios después de generar cuotas
+      const props = await query(env, `SELECT id FROM propietarios WHERE estado != 'inactivo'`);
+      for (const p of props) {
+        try { await reconciliarPagos(env, p.id); } catch(e) {}
       }
       console.log(`Total cuotas generadas: ${totalGeneradas}`);
     } catch (e) {

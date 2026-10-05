@@ -88,12 +88,15 @@ window.NassauDocumentos = {
              prop.docs.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
                  const fecha = d.fecha_emision || d.fecha_generacion;
                  const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
-                 const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
-                 html += `
-                     <tr>
-                         <td><strong>${d.codigo || d.codigo_doc}</strong></td>
-                         <td>${fechaStr}</td>
-                         <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
+                  const totalMostrar = d.es_a_favor
+                      ? Number(d.valor_a_pagar_a_favor || 0)
+                      : (Number(d.total_documento || d.total_deuda || 0) || 0);
+                  const badgeAFavor = d.es_a_favor ? ' <span style="background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:1px 6px;font-size:0.7rem;font-weight:bold;">A FAVOR</span>' : '';
+                  html += `
+                      <tr>
+                          <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                          <td>${fechaStr}</td>
+                          <td><strong>$${totalMostrar.toLocaleString()}</strong>${badgeAFavor}</td>
                             <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
                             <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarCorreo(${JSON.stringify(d).replace(/'/g, "&#39;")})'>✉ Correo</button></td>
                             <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarWhatsApp(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📱 WhatsApp</button></td>
@@ -137,12 +140,15 @@ window.NassauDocumentos = {
           docsFiltrados.sort((a, b) => (b.consecutivo || 0) - (a.consecutivo || 0)).forEach(d => {
               const fecha = d.fecha_emision || d.fecha_generacion;
               const fechaStr = fecha ? new Date(fecha).toLocaleDateString() : '';
-              const totalMostrar = Number(d.total_documento || d.total_deuda || 0) || 0;
-               html += `
-                   <tr>
-                       <td><strong>${d.codigo || d.codigo_doc}</strong></td>
-                       <td>${fechaStr}</td>
-                       <td><strong>$${totalMostrar.toLocaleString()}</strong></td>
+               const totalMostrar = d.es_a_favor
+                    ? Number(d.valor_a_pagar_a_favor || 0)
+                    : (Number(d.total_documento || d.total_deuda || 0) || 0);
+               const badgeAFavor = d.es_a_favor ? ' <span style="background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:1px 6px;font-size:0.7rem;font-weight:bold;">A FAVOR</span>' : '';
+                html += `
+                    <tr>
+                        <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                        <td>${fechaStr}</td>
+                        <td><strong>$${totalMostrar.toLocaleString()}</strong>${badgeAFavor}</td>
                        <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
                         <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarCorreo(${JSON.stringify(d).replace(/'/g, "&#39;")})'>✉ Correo</button></td>
                         <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.enviarWhatsApp(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📱 WhatsApp</button></td>
@@ -322,11 +328,12 @@ window.NassauDocumentos = {
             let y0 = b + 30;
             try {
             const desglose = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
-            if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util)) {
+            if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util || desglose.valor_local)) {
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0,0,0);
                 let desTxt = `Desglose: Apto $${Number(desglose.valor_apto||0).toLocaleString()}`;
                 if (desglose.valor_celda) desTxt += ` | Celda $${Number(desglose.valor_celda).toLocaleString()}`;
                 if (desglose.valor_cuarto_util) desTxt += ` | Cuarto $${Number(desglose.valor_cuarto_util).toLocaleString()}`;
+                if (desglose.valor_local) desTxt += ` | Local $${Number(desglose.valor_local).toLocaleString()}`;
                 doc.setFillColor(255,255,200); doc.rect(M, y0, RIGHT-M, 4, 'F');
                 doc.text(desTxt, M+1, y0+2.8);
                 y0 += 6;
@@ -339,6 +346,64 @@ window.NassauDocumentos = {
 
             doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
             let y = y0 + 6;
+
+            // ── FÓRMULA COMPLETA DEL ESTADO DE CUENTA ──────────────────
+            // SALDO A PAGAR = (Σ cuotas + Σ intereses + cuotas extras +
+            //   retroactivo + cuota extra) − (Σ pagos aplicados)
+            // El abono inicial ya es un pago real (tabla pagos, tipo
+            // 'abono'), por lo que Σ pagos lo incluye. NO se suma
+            // saldo_anterior: la deuda arrastrada ya está contenida en
+            // pago_actual de los meses posteriores y sumarla provoca
+            // doble conteo (ej: 8 meses sin pago daba 15× cuota).
+            const todosPeriodos = detalle?.periodos_pendientes || [];
+            const extrasLista = detalle?.cuotas_extras || [];
+            const retroMonto = detalle?.retroactivo && Number(detalle.retroactivo.monto || 0) > 0 ? Number(detalle.retroactivo.monto) : 0;
+            const cuotaExtraVal = Number(detalle?.cuota_extra || 0);
+            const ceMesInicio = parseInt(detalle?.cuota_extra_mes_inicio) || 0;
+            const ceAnioInicio = parseInt(detalle?.cuota_extra_anio_inicio) || 0;
+            const ceDuracion = parseInt(detalle?.cuota_extra_duracion) || 0;
+            const mesActualNum = new Date().getMonth() + 1;
+            const anioActualNum = new Date().getFullYear();
+            const aplicaCuotaExtra = cuotaExtraVal > 0 && ceMesInicio > 0 && ceAnioInicio > 0 && ceDuracion > 0 &&
+                (anioActualNum - ceAnioInicio) * 12 + mesActualNum >= ceAnioInicio * 12 + ceMesInicio &&
+                (anioActualNum - ceAnioInicio) * 12 + mesActualNum <= ceAnioInicio * 12 + ceMesInicio + ceDuracion - 1;
+            const ceMonto = aplicaCuotaExtra ? cuotaExtraVal : 0;
+
+            const pagosAplicados = detalle?.pagos_aplicados || [];
+            let totalPagos = 0;
+            pagosAplicados.forEach(pg => { totalPagos += Number(pg.monto || 0); });
+
+            const tieneTotales = t && (t.saldo_a_pagar !== undefined || t.total_cargos !== undefined);
+            let totalCargos, saldoNeto, esAFavor, valorAPagar, valorAFavor, deudaAnterior, cuotaMesConInteres, interesesPrevios;
+            if (tieneTotales) {
+              // Documentos nuevos: valores calculados por el backend
+              totalCargos = Number(t.total_cargos) || 0;
+              if (Number(t.pagos_aplicados) || Number(t.total_pagos)) totalPagos = Number(t.pagos_aplicados ?? t.total_pagos) || 0;
+              saldoNeto = t.saldo_a_pagar !== undefined ? Number(t.saldo_a_pagar) : Math.round((totalCargos - totalPagos) * 100) / 100;
+              esAFavor = Boolean(t.es_a_favor) || saldoNeto < 0;
+              valorAPagar = Number(t.valor_a_pagar) || Math.max(0, saldoNeto);
+              valorAFavor = Number(t.valor_a_pagar_a_favor) || Math.max(0, -saldoNeto);
+              deudaAnterior = Number(t.deuda_anterior) || 0;
+              cuotaMesConInteres = (Number(t.cuota_mes_actual) || 0) + (Number(t.intereses_mes_actual) || 0);
+              interesesPrevios = Math.max(0, (Number(t.intereses) || 0) - (Number(t.intereses_mes_actual) || 0));
+            } else {
+              // Documentos antiguos: recomputar desde los periodos
+              const cargosPeriodos = todosPeriodos.reduce((s, p) => s + (Number(p.pago_actual) || 0) + (Number(p.intereses) || 0), 0);
+              const cargosExtras = extrasLista.reduce((s, e) => s + (Number(e.monto) || 0), 0);
+              totalCargos = cargosPeriodos + cargosExtras + retroMonto + ceMonto;
+              saldoNeto = Math.round((totalCargos - totalPagos) * 100) / 100;
+              esAFavor = saldoNeto < 0;
+              valorAPagar = Math.max(0, saldoNeto);
+              valorAFavor = Math.max(0, -saldoNeto);
+              const sortedLegacy = [...todosPeriodos].sort((a, b) => (a.anio - b.anio) || (a.mes - b.mes));
+              const lastLegacy = sortedLegacy[sortedLegacy.length - 1] || null;
+              const esMesActualLegacy = lastLegacy && parseInt(lastLegacy.mes) === mesActualNum && parseInt(lastLegacy.anio) === anioActualNum;
+              cuotaMesConInteres = esMesActualLegacy ? (Number(lastLegacy.pago_actual) || 0) : 0;
+              deudaAnterior = Math.round((saldoNeto - cuotaMesConInteres) * 100) / 100;
+              interesesPrevios = Number(t.intereses) || 0;
+            }
+            // TOTAL CUOTAS (línea de subtotal): cargos anteriores al mes actual
+            const totalCuotasLine = Math.round((deudaAnterior + totalPagos) * 100) / 100;
 
             const rows = [];
 
@@ -357,7 +422,7 @@ window.NassauDocumentos = {
                         total_deuda: cuotaMes,
                         pagado: p.pagado || 0,
                         pendiente: p.pendiente || cuotaMes,
-                        valor_apto: p.valor_apto, valor_celda: p.valor_celda, valor_cuarto_util: p.valor_cuarto_util
+                        valor_apto: p.valor_apto, valor_celda: p.valor_celda, valor_cuarto_util: p.valor_cuarto_util, valor_local: p.valor_local
                     });
                 }
             });
@@ -366,19 +431,19 @@ window.NassauDocumentos = {
             // mostrar todos los meses pendientes (enero-agosto) en una sola línea por concepto
             todasLasCuotas.forEach(r => {
                 if (y > b + 88) return;
-                let va = Number(r.valor_apto||0), vc = Number(r.valor_celda||0), vq = Number(r.valor_cuarto_util||0);
-                let hasDes = va || vc || vq;
-                if (!hasDes && desgloseHeader && (desgloseHeader.valor_apto||desgloseHeader.valor_celda||desgloseHeader.valor_cuarto_util)) {
-                    va = Number(desgloseHeader.valor_apto||0); vc = Number(desgloseHeader.valor_celda||0); vq = Number(desgloseHeader.valor_cuarto_util||0); hasDes = va||vc||vq;
+                let va = Number(r.valor_apto||0), vc = Number(r.valor_celda||0), vq = Number(r.valor_cuarto_util||0), vl = Number(r.valor_local||0);
+                let hasDes = va || vc || vq || vl;
+                if (!hasDes && desgloseHeader && (desgloseHeader.valor_apto||desgloseHeader.valor_celda||desgloseHeader.valor_cuarto_util||desgloseHeader.valor_local)) {
+                    va = Number(desgloseHeader.valor_apto||0); vc = Number(desgloseHeader.valor_celda||0); vq = Number(desgloseHeader.valor_cuarto_util||0); vl = Number(desgloseHeader.valor_local||0); hasDes = va||vc||vq||vl;
                 }
                 let label = r.label;
                 if (hasDes) {
                     let sub = ` (Apto $${va.toLocaleString()}`;
                     if (vc) sub += ` | Celda $${vc.toLocaleString()}`;
                     if (vq) sub += ` | Cuarto $${vq.toLocaleString()}`;
+                    if (vl) sub += ` | Local $${vl.toLocaleString()}`;
                     sub += `)`;
                     label += sub;
-                    // truncar si excede ancho
                     const maxW = (RIGHT - 12) - M - 28;
                     if (doc.getTextWidth(label) > maxW) {
                         label = label.substring(0, 72) + '...';
@@ -397,11 +462,11 @@ window.NassauDocumentos = {
                 doc.text(`$${Number(e.monto || 0).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4;
             });
-            if (Number(t.intereses || 0) > 0) {
+            if (interesesPrevios > 0) {
                 if (y > b + 88) return;
                 doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
                 doc.text('Intereses causados', M, y);
-                doc.text(`$${Number(t.intereses).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                doc.text(`$${Number(interesesPrevios).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 4;
             }
             const retroactivo = detalle?.retroactivo;
@@ -413,57 +478,40 @@ window.NassauDocumentos = {
                 y += 4;
             }
 
-// Cuota Extra (verificar si aplica al mes actual)
-             const cuotaExtraVal = Number(detalle?.cuota_extra || 0);
-             const ceMesInicio = parseInt(detalle?.cuota_extra_mes_inicio) || 0;
-             const ceAnioInicio = parseInt(detalle?.cuota_extra_anio_inicio) || 0;
-             const ceDuracion = parseInt(detalle?.cuota_extra_duracion) || 0;
-             const mesActual = new Date().getMonth() + 1;
-             const anioActual = new Date().getFullYear();
-             const aplicaCuotaExtra = cuotaExtraVal > 0 && ceMesInicio > 0 && ceAnioInicio > 0 && ceDuracion > 0 &&
-                 (anioActual - ceAnioInicio) * 12 + mesActual >= ceAnioInicio * 12 + ceMesInicio &&
-                 (anioActual - ceAnioInicio) * 12 + mesActual <= ceAnioInicio * 12 + ceMesInicio + ceDuracion - 1;
              if (aplicaCuotaExtra) {
-                 doc.setFont('helvetica', 'normal');
+                 doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
                  doc.text('Cuota Extra', M, y);
                  doc.text(`$${cuotaExtraVal.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                  y += 4.3;
              }
 
              // TOTAL DE CUOTAS (suma de todas las cuotas de administración + retroactivo + cuota extra)
-             let totalCuotas = 0;
-             todasLasCuotas.forEach(r => { totalCuotas += r.value; });
-             const retroactivoMonto = retroactivo && Number(retroactivo.monto || 0) > 0 ? Number(retroactivo.monto) : 0;
-             const cuotaExtraMonto = aplicaCuotaExtra ? cuotaExtraVal : 0;
-             totalCuotas += retroactivoMonto + cuotaExtraMonto;
+             // (cálculo de totales movido arriba: FÓRMULA COMPLETA DEL ESTADO DE CUENTA)
             
-            // Pagos aplicados (abonos reales del propietario)
-            const pagosAplicados = detalle?.pagos_aplicados || [];
-            let totalPagos = 0;
-            pagosAplicados.forEach(pg => { totalPagos += Number(pg.monto || 0); });
+             // Pagos aplicados: calculados arriba (Σ monto de pagos_aplicados)
             
-            // Construir descripción de pagos en una sola línea
-            let pagosDescripcion = '';
-            if (pagosAplicados.length > 0) {
-                const pagosLista = pagosAplicados.map(pg => {
-                    const fechaPg = pg.fecha_pago ? new Date(pg.fecha_pago).toLocaleDateString() : '';
-                    return `${pg.comprobante || ''} ${fechaPg}`;
-                }).join(', ');
-                pagosDescripcion = ` (${pagosLista})`;
-            }
+             // (descripción de pagos se construye abajo, junto al detalle)
             
-            if (totalCuotas > 0) {
+            if (totalCargos > 0) {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
                 doc.line(M, y, RIGHT, y);
                 y += 4;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text('TOTAL CUOTAS:', M, y);
-                doc.text(`$${totalCuotas.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                doc.text(`$${totalCuotasLine.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 5;
 
                 // Pagos aplicados en una o dos líneas
                 if (totalPagos > 0) {
                     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+                    let pagosDescripcion = '';
+                    if (pagosAplicados.length > 0) {
+                        const pagosLista = pagosAplicados.map(pg => {
+                            const fechaPg = pg.fecha_pago ? new Date(pg.fecha_pago).toLocaleDateString() : '';
+                            return `${pg.comprobante || ''} ${fechaPg}`;
+                        }).join(', ');
+                        pagosDescripcion = ` (${pagosLista})`;
+                    }
                     const textoPagos = `Pagos aplicados${pagosDescripcion}:`;
                     const anchoDisponible = (RIGHT - 12) - M;
                     const textoWidth = doc.getTextWidth(textoPagos);
@@ -488,14 +536,14 @@ window.NassauDocumentos = {
                     }
                 }
 
-                // ESTADO DE CUENTA
-                const estadoCuenta = totalCuotas - totalPagos;
+                // ESTADO DE CUENTA: deuda arrastrada neta de pagos.
+                // Negativo = saldo a favor (los pagos superan los cargos previos).
                 doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
                 doc.line(M, y, RIGHT, y);
                 y += 5;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 150, 150);
-                doc.text('ESTADO DE CUENTA:', M, y);
-                doc.text(`$${estadoCuenta.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                doc.text(deudaAnterior < 0 ? 'ESTADO DE CUENTA (a favor):' : 'ESTADO DE CUENTA:', M, y);
+                doc.text(`$${Math.abs(deudaAnterior).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 doc.setTextColor(0, 0, 0);
                 y += 6;
             } else {
@@ -503,14 +551,13 @@ window.NassauDocumentos = {
                 doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
                 doc.line(M, y, RIGHT, y);
                 y += 4;
-                const totalDeuda = total <= 0 ? 0 : total;
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text('TOTAL A PAGAR:', M, y);
-                doc.text(`$${totalDeuda.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+                doc.text(`$${valorAPagar.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
                 y += 6;
             }
 
-            // Cuota de administración del mes actual
+            // Cuota de administración del mes actual + VALOR A PAGAR / (A FAVOR)
             doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
             doc.line(M, y, RIGHT, y);
             y += 5;
@@ -518,30 +565,19 @@ window.NassauDocumentos = {
             doc.text('Cuota de administración mensual:', M, y);
             y += 5;
             doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-            const sortedPeriods = [...(detalle?.periodos_pendientes||[])].sort((a,b)=> (a.anio - b.anio) || (a.mes - b.mes));
+            const sortedPeriods = [...todosPeriodos].sort((a,b)=> (a.anio - b.anio) || (a.mes - b.mes));
             const lastP = sortedPeriods.length ? sortedPeriods[sortedPeriods.length-1] : null;
-            const mesActualLabel = mesNames[lastP?.mes || new Date().getMonth()+1] || '';
-            const anioActualLabel = lastP?.anio || new Date().getFullYear();
-            // valor del mes actual = pago_actual del último periodo (con desglose)
-            let cuotaActualMostrar = 0;
-            if (lastP) {
-                const hasDesLast = (Number(lastP.valor_apto)||0)+(Number(lastP.valor_celda)||0)+(Number(lastP.valor_cuarto_util)||0) > 0;
-                cuotaActualMostrar = hasDesLast ? ((Number(lastP.valor_apto)||0)+(Number(lastP.valor_celda)||0)+(Number(lastP.valor_cuarto_util)||0)) : Number(lastP.pago_actual||0);
-            }
-            if (!cuotaActualMostrar) {
-                const desgloseActual = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
-                const totalDesglose = desgloseActual ? (Number(desgloseActual.valor_apto||0)+Number(desgloseActual.valor_celda||0)+Number(desgloseActual.valor_cuarto_util||0)) : 0;
-                cuotaActualMostrar = Number(t.cuota_mes_actual) || totalDesglose || Number(t.cuota_admon) || 0;
-            }
-            const saldoMostrar = Number(t.total) || Number(t.total_deuda) || cuotaActualMostrar;
+            const mesActualLabel = mesNames[lastP?.mes || mesActualNum] || '';
+            const anioActualLabel = lastP?.anio || anioActualNum;
             doc.text(`Cuota ${mesActualLabel} ${anioActualLabel}:`, M, y);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-            doc.text(`$${cuotaActualMostrar.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+            doc.text(`$${Math.abs(cuotaMesConInteres).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
             y += 6;
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-            doc.text('SALDO A PAGAR', M, y);
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-            doc.text(`$${saldoMostrar.toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
+            // VALOR A PAGAR: resultado final del estado de cuenta.
+            // Si el saldo es negativo, el propietario tiene saldo a favor.
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+            doc.text(esAFavor ? 'VALOR A PAGAR (A FAVOR):' : 'VALOR A PAGAR:', M, y);
+            doc.setFontSize(12);
+            doc.text(`$${(esAFavor ? valorAFavor : valorAPagar).toLocaleString()}`, RIGHT - 12, y, { align: 'right' });
 
             // ── Pie de copia: CONSIGNACIÓN (2 renglones) ─────────────────────────
             const yf = Math.max(b + 100, y + 10);

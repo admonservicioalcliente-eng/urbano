@@ -46,6 +46,28 @@ export async function handleGetAll(request, env, user) {
   sql += ` ORDER BY cc.consecutivo DESC LIMIT 100`;
 
   const rows = await query(env, sql, params);
+  // Aplanar los totales del detalle_json para que la reimpresión del PDF
+  // tenga el estado de cuenta calculado (saldo a pagar / saldo a favor).
+  for (const r of rows) {
+    let dj = r.detalle_json;
+    if (typeof dj === 'string' && dj) { try { dj = JSON.parse(dj); } catch { dj = null; } }
+    const tt = dj && typeof dj === 'object' ? dj.totales : null;
+    if (tt) {
+      r.total_documento = Number(r.total_deuda) || 0;
+      r.cuota_admon = Number(tt.cuota_admon) || 0;
+      r.saldo_anterior = Number(tt.saldo_anterior) || 0;
+      r.intereses = Number(tt.intereses) || 0;
+      r.total_cargos = Number(tt.total_cargos) || 0;
+      r.pagos_aplicados = Number(tt.pagos_aplicados) || 0;
+      r.deuda_anterior = Number(tt.deuda_anterior) || 0;
+      r.cuota_mes_actual = Number(tt.cuota_mes_actual) || 0;
+      r.intereses_mes_actual = Number(tt.intereses_mes_actual) || 0;
+      r.saldo_a_pagar = Number(tt.saldo_a_pagar) || 0;
+      r.valor_a_pagar = Number(tt.valor_a_pagar) || 0;
+      r.valor_a_pagar_a_favor = Number(tt.valor_a_pagar_a_favor) || 0;
+      r.es_a_favor = !!tt.es_a_favor;
+    }
+  }
   return ok(rows);
 }
 
@@ -69,14 +91,16 @@ export async function handleCreate(request, env, user) {
     const prCC = await query(env, `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id=$1 AND anio=EXTRACT(YEAR FROM NOW())`, [prop.urbanizacion_id]);
     presupuestoCC = prCC.length ? parseFloat(prCC[0].cuota_admon) : 0;
   } catch {}
-  const coefA = parseFloat(prop.coef_apto)||0, coefC = prop.has_celda ? parseFloat(prop.coef_celda)||0 :0, coefQ = prop.has_cuarto_util ? parseFloat(prop.coef_cuarto_util)||0:0;
+  const coefA = parseFloat(prop.coef_apto)||0, coefC = prop.has_celda ? parseFloat(prop.coef_celda)||0 :0, coefQ = prop.has_cuarto_util ? parseFloat(prop.coef_cuarto_util)||0:0, coefL = prop.has_local ? parseFloat(prop.coef_local)||0:0;
   const vcFixed = prop.has_celda ? parseFloat(prop.valor_celda)||0 :0;
   const vqFixed = prop.has_cuarto_util ? parseFloat(prop.valor_cuarto_util)||0 :0;
-  let vAptoCC=0, vCeldaCC=0, vCuartoCC=0;
-  if (presupuestoCC>0 && (coefA+coefC+coefQ)>0) {
+  const vlFixed = prop.has_local ? parseFloat(prop.valor_local)||0 :0;
+  let vAptoCC=0, vCeldaCC=0, vCuartoCC=0, vLocalCC=0;
+  if (presupuestoCC>0 && (coefA+coefC+coefQ+coefL)>0) {
     vAptoCC = Math.round(presupuestoCC * coefA /100 *100)/100;
     vCeldaCC = prop.has_celda ? Math.round((presupuestoCC * coefC /100 + vcFixed)*100)/100 :0;
     vCuartoCC = prop.has_cuarto_util ? Math.round((presupuestoCC * coefQ /100 + vqFixed)*100)/100 :0;
+    vLocalCC = prop.has_local ? Math.round((presupuestoCC * coefL /100 + vlFixed)*100)/100 :0;
   }
 
    const propContacto = {
@@ -85,10 +109,10 @@ export async function handleCreate(request, env, user) {
      cuota_admon: prop.cuota_admon,
      email: prop.email || '',
      telefono: prop.telefono || '',
-     coef_apto: prop.coef_apto, coef_celda: prop.coef_celda, coef_cuarto_util: prop.coef_cuarto_util,
-     valor_celda: prop.valor_celda, valor_cuarto_util: prop.valor_cuarto_util,
-     has_celda: prop.has_celda, has_cuarto_util: prop.has_cuarto_util,
-     desglose: { valor_apto: vAptoCC, valor_celda: vCeldaCC, valor_cuarto_util: vCuartoCC, presupuesto: presupuestoCC }
+      coef_apto: prop.coef_apto, coef_celda: prop.coef_celda, coef_cuarto_util: prop.coef_cuarto_util, coef_local: prop.coef_local,
+      valor_celda: prop.valor_celda, valor_cuarto_util: prop.valor_cuarto_util, valor_local: prop.valor_local,
+      has_celda: prop.has_celda, has_cuarto_util: prop.has_cuarto_util, has_local: prop.has_local,
+      desglose: { valor_apto: vAptoCC, valor_celda: vCeldaCC, valor_cuarto_util: vCuartoCC, valor_local: vLocalCC, presupuesto: presupuestoCC }
    };
 
   // ¿Es la primera cuenta de cobro del propietario? Si es nueva y tiene abono
@@ -160,69 +184,68 @@ export async function handleCreate(request, env, user) {
     [user.urbanizacion_id, propietario_id]
   );
 
-  // Estados abiertos: los que aún no se han pagado.
-  // Si no hay ninguno, verificar si el período actual YA fue facturado.
+  // Mes actual: si el período actual no tiene estado (cuota aún no
+  // generada por el cron), se incluye la cuota vigente como período
+  // virtual (sin persistir) para que el estado de cuenta sea completo.
   const hoy = new Date();
   const anioActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
 
-  if (!ecs.length) {
-    const billed = await query(env,
-      `SELECT COUNT(*) AS n FROM estados_cuenta
-       WHERE propietario_id = $1 AND anio = $2 AND mes = $3`,
-      [propietario_id, anioActual, mesActual]
-    );
-    // Solo si el período actual NO ha sido facturado se incluye la cuota del mes
-    if (parseInt(billed[0].n) === 0) {
-      ecs = [{
-        anio: anioActual,
-        mes: mesActual,
-        pago_actual: propContacto.cuota_admon,
-        saldo_anterior: '0',
-        intereses: '0',
-        saldo_favor: '0'
-      }];
-    }
+  const tieneMesActual = ecs.some(e => parseInt(e.anio) === anioActual && parseInt(e.mes) === mesActual);
+  if (!tieneMesActual && prop.estado !== 'inactivo') {
+    const sumDesglose = vAptoCC + vCeldaCC + vCuartoCC + vLocalCC;
+    const cuotaVirtual = sumDesglose > 0
+      ? sumDesglose
+      : (parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || 0);
+    ecs = [...ecs, {
+      anio: anioActual,
+      mes: mesActual,
+      pago_actual: cuotaVirtual,
+      saldo_anterior: 0,
+      saldo_favor: 0,
+      intereses: 0,
+      cerrado: false,
+      dias_mora: 0,
+      valor_apto: vAptoCC,
+      valor_celda: vCeldaCC,
+      valor_cuarto_util: vCuartoCC,
+      valor_local: vLocalCC,
+      virtual: true
+    }];
   }
 
-  let totalCuota = 0, totalInteres = 0, totalSaldoAnt = 0, totalSaldoFavor = 0;
-  let lastOpenTotal = 0;
+  // ── FÓRMULA COMPLETA DEL ESTADO DE CUENTA ───────────────────────────
+  // SALDO A PAGAR = (Σ cuotas + Σ intereses + cuotas extras + retroactivo
+  //                  + cuota extra) − (Σ pagos aplicados)
+  // El abono inicial ya se registra como pago real (tabla pagos, tipo
+  // 'abono'), por lo que Σ pagos lo incluye: NO se descuenta aparte.
+  let totalCuotas = 0, totalIntereses = 0;
+  let cargosAnteriores = 0, cuotaMesActual = 0, interesesMesActual = 0;
   for (const ec of ecs) {
-    if (ec.cerrado) continue;
-    const pagoActual = parseFloat(ec.pago_actual) || 0;
-    const intereses = parseFloat(ec.intereses) || 0;
-    const saldoFavor = parseFloat(ec.saldo_favor) || 0;
-    totalCuota += pagoActual;
-    totalInteres += intereses;
-    totalSaldoFavor += saldoFavor;
-    const baseMes = pagoActual + parseFloat(ec.saldo_anterior||0) + intereses - saldoFavor;
-    if (baseMes > lastOpenTotal) lastOpenTotal = Math.max(0, baseMes);
+    const pago = parseFloat(ec.pago_actual) || 0;
+    const inte = parseFloat(ec.intereses) || 0;
+    totalCuotas += pago;
+    totalIntereses += inte;
+    const esActual = parseInt(ec.anio) === anioActual && parseInt(ec.mes) === mesActual;
+    if (esActual) { cuotaMesActual = pago; interesesMesActual = inte; }
+    else { cargosAnteriores += pago + inte; }
   }
-  // deuda anterior + cuota mes actual se deriva del último total, pero para compatibilidad
-  // si hay 8 meses sin pago, total = 8*330728 = 2645824 (suma de pago_actual)
-  // usamos lastOpenTotal como total real si existe, si no sumamos
   let totalExtras = 0;
   for (const ex of extras) totalExtras += parseFloat(ex.monto) || 0;
-  const totalDeudaCalc = lastOpenTotal > 0 ? lastOpenTotal : (totalCuota + totalInteres - totalSaldoFavor);
-  const totalDeuda = totalDeudaCalc + totalExtras + retroactivoMonto + cuotaExtra;
-  // para desglose PDF, deudaAnterior y cuotaMesActual se calculan por separado si se necesitan
-  let deudaAnterior = 0, cuotaMesActual = 0;
-  // recalcular deudaAnterior/cuotaMesActual para compatibilidad con detalle
-  for (const ec of ecs) {
-    if (ec.cerrado) continue;
-    const esMesActual = parseInt(ec.anio) === anioActual && parseInt(ec.mes) === mesActual;
-    const baseMes = parseFloat(ec.pago_actual||0) + parseFloat(ec.saldo_anterior||0) + parseFloat(ec.intereses||0) - parseFloat(ec.saldo_favor||0);
-    if (esMesActual) cuotaMesActual = Math.max(0, baseMes);
-    else if (!esMesActual) {
-      // deudaAnterior será total sin el mes actual
-      // se deja como 0 porque total ya incluye todo, pero mantenemos para detalle
-    }
-  }
-  // si cuotaMesActual sigue 0 y hay lastOpen, usar pago_actual del último mes
-  if (!cuotaMesActual && lastOpenTotal) {
-    const lastEc = [...ecs].filter(e=>!e.cerrado).sort((a,b)=>(a.anio-b.anio)||(a.mes-b.mes)).pop();
-    if (lastEc) cuotaMesActual = parseFloat(lastEc.pago_actual)||0;
-  }
+
+  const totalCargos = totalCuotas + totalIntereses + totalExtras + retroactivoMonto + cuotaExtra;
+  const pagosAplicados = totalPagos; // Σ pagos (ya incluye abono inicial)
+  const saldoAPagarNeto = Math.round((totalCargos - pagosAplicados) * 100) / 100;
+  const esAFavor = saldoAPagarNeto < 0;
+  const valorAPagar = esAFavor ? 0 : saldoAPagarNeto;
+  const valorAPagarAFavor = esAFavor ? Math.round(-saldoAPagarNeto * 100) / 100 : 0;
+  // Deuda arrastrada anterior al mes actual, neta de pagos. Puede ser
+  // negativa (saldo a favor) cuando los pagos superan los cargos previos.
+  const deudaAnteriorNeta = Math.round((cargosAnteriores + totalExtras + retroactivoMonto + cuotaExtra - pagosAplicados) * 100) / 100;
+
+  // El documento almacena el valor a pagar (0 si hay saldo a favor);
+  // el detalle_json guarda el saldo neto con signo.
+  const totalDeuda = valorAPagar;
 
 const detalleJson = {
      mostrar_copia: mostrarCopia,
@@ -254,7 +277,7 @@ const detalleJson = {
         anio: e.anio,
         mes: e.mes,
         pago_actual: e.pago_actual,
-        valor_apto: e.valor_apto, valor_celda: e.valor_celda, valor_cuarto_util: e.valor_cuarto_util,
+        valor_apto: e.valor_apto, valor_celda: e.valor_celda, valor_cuarto_util: e.valor_cuarto_util, valor_local: e.valor_local,
         saldo_anterior: e.saldo_anterior,
         intereses: e.intereses,
         saldo_favor: e.saldo_favor,
@@ -289,19 +312,27 @@ const detalleJson = {
       descripcion: pg.descripcion
     })),
     total_pagos: Math.round(totalPagos * 100) / 100,
-totales: {
-       cuota_admon: Math.round(totalCuota * 100) / 100,
-       saldo_anterior: Math.round(totalSaldoAnt * 100) / 100,
-       intereses: Math.round(totalInteres * 100) / 100,
-       cuotas_extras: Math.round(totalExtras * 100) / 100,
-       retroactivo: Math.round(retroactivoMonto * 100) / 100,
-       saldo_favor: Math.round(totalSaldoFavor * 100) / 100,
-       abono_inicial: Math.round(abonoAplicado * 100) / 100,
-       deuda_anterior: Math.round(deudaAnterior * 100) / 100,
-       cuota_mes_actual: Math.round(cuotaMesActual * 100) / 100,
-       cuota_extra: Math.round(cuotaExtra * 100) / 100,
-       total: Math.round(totalDeuda * 100) / 100
-     },
+     totales: {
+        cuota_admon: Math.round(totalCuotas * 100) / 100,
+        saldo_anterior: deudaAnteriorNeta,
+        intereses: Math.round(totalIntereses * 100) / 100,
+        cuotas_extras: Math.round(totalExtras * 100) / 100,
+        retroactivo: Math.round(retroactivoMonto * 100) / 100,
+        saldo_favor: Math.round(pagosAplicados * 100) / 100,
+        abono_inicial: Math.round(abonoAplicado * 100) / 100,
+        deuda_anterior: deudaAnteriorNeta,
+        cuota_mes_actual: Math.round(cuotaMesActual * 100) / 100,
+        intereses_mes_actual: Math.round(interesesMesActual * 100) / 100,
+        cuota_extra: Math.round(cuotaExtra * 100) / 100,
+        total_cargos: Math.round(totalCargos * 100) / 100,
+        pagos_aplicados: Math.round(pagosAplicados * 100) / 100,
+        total_pagos: Math.round(totalPagos * 100) / 100,
+        saldo_a_pagar: saldoAPagarNeto,
+        valor_a_pagar: valorAPagar,
+        valor_a_pagar_a_favor: valorAPagarAFavor,
+        es_a_favor: esAFavor,
+        total: valorAPagar
+      },
     cuenta_bancaria: {
       banco: 'NEQUI',
       tipo: 'Cuenta',
@@ -325,6 +356,20 @@ totales: {
   created.fecha_emision = hoy.toISOString();
   created.propietario_nombre = prop.nombre_propietario;
   created.propietario_apto = prop.apartamento;
+  // Campos aplanados del estado de cuenta (para generación inmediata del PDF)
+  created.total_documento = valorAPagar;
+  created.cuota_admon = Math.round(totalCuotas * 100) / 100;
+  created.saldo_anterior = deudaAnteriorNeta;
+  created.intereses = Math.round(totalIntereses * 100) / 100;
+  created.total_cargos = Math.round(totalCargos * 100) / 100;
+  created.pagos_aplicados = Math.round(pagosAplicados * 100) / 100;
+  created.deuda_anterior = deudaAnteriorNeta;
+  created.cuota_mes_actual = Math.round(cuotaMesActual * 100) / 100;
+  created.intereses_mes_actual = Math.round(interesesMesActual * 100) / 100;
+  created.saldo_a_pagar = saldoAPagarNeto;
+  created.valor_a_pagar = valorAPagar;
+  created.valor_a_pagar_a_favor = valorAPagarAFavor;
+  created.es_a_favor = esAFavor;
 
   // Limpiar retroactivo después de generar la CC (solo se cobra una vez)
   if (retroactivoMonto > 0) {

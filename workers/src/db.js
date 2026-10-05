@@ -51,21 +51,26 @@ export async function ensureMigrations(env) {
         await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_anio_inicio INTEGER DEFAULT 0`);
          await sql.unsafe(`ALTER TABLE parametros_anio ADD COLUMN IF NOT EXISTS cuota_extra_duracion INTEGER DEFAULT 0`);
          console.log('Migration: cuota_extra columns added');
-         // Propietarios: coeficientes y valores por inmueble (apto/celda/cuarto)
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_apto DECIMAL(10,4) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_celda DECIMAL(10,4) DEFAULT 0`);
-         await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_cuarto_util DECIMAL(10,4) DEFAULT 0`);
+          // Propietarios: coeficientes y valores por inmueble (apto/celda/cuarto/local)
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_apto DECIMAL(10,4) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_celda DECIMAL(10,4) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_cuarto_util DECIMAL(10,4) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS coef_local DECIMAL(10,4) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS valor_local DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_celda BOOLEAN DEFAULT FALSE`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_cuarto_util BOOLEAN DEFAULT FALSE`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS has_local BOOLEAN DEFAULT FALSE`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS no_cuarto_util VARCHAR(30)`);
+          await sql.unsafe(`ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS no_local VARCHAR(30)`);
           await sql.unsafe(`UPDATE propietarios SET cuota_total = cuota_admon WHERE cuota_total IS NULL OR cuota_total = 0`);
           // Estados de cuenta: desglose por item
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_apto DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_celda DECIMAL(12,2) DEFAULT 0`);
           await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_cuarto_util DECIMAL(12,2) DEFAULT 0`);
+          await sql.unsafe(`ALTER TABLE estados_cuenta ADD COLUMN IF NOT EXISTS valor_local DECIMAL(12,2) DEFAULT 0`);
           // Corregir estados existentes que tenían presupuesto como pago_actual (234000) -> usar cuota del propietario
           await sql.unsafe(`
             UPDATE estados_cuenta ec SET
@@ -109,13 +114,24 @@ export async function ensureMigrations(env) {
              v_presupuesto   DECIMAL(12,2);
              v_sum_coef      DECIMAL(10,4);
              v_total_cuota   DECIMAL(12,2);
-             v_vapto DECIMAL(12,2); v_vcelda DECIMAL(12,2); v_vcuarto DECIMAL(12,2);
+              v_vapto DECIMAL(12,2); v_vcelda DECIMAL(12,2); v_vcuarto DECIMAL(12,2); v_vlocal DECIMAL(12,2);
          BEGIN
              SELECT * INTO v_params FROM parametros_anio WHERE urbanizacion_id = p_urbanizacion_id AND anio = p_anio;
              IF NOT FOUND THEN RAISE EXCEPTION 'Sin parámetros para año %', p_anio; END IF;
              v_fecha_vcto := MAKE_DATE(p_anio, p_mes, v_params.dia_vencimiento_sin_mora);
              IF p_mes = 1 THEN v_mes_anterior:=12; v_anio_anterior:=p_anio-1; ELSE v_mes_anterior:=p_mes-1; v_anio_anterior:=p_anio; END IF;
              FOR v_prop IN SELECT * FROM propietarios WHERE urbanizacion_id = p_urbanizacion_id AND estado != 'inactivo' LOOP
+                  -- Respetar fecha de registro: no generar estados anteriores al created_at
+                  IF v_prop.created_at IS NOT NULL THEN
+                    DECLARE
+                      v_created_anio INT := EXTRACT(YEAR FROM v_prop.created_at);
+                      v_created_mes INT := EXTRACT(MONTH FROM v_prop.created_at);
+                    BEGIN
+                      IF p_anio < v_created_anio OR (p_anio = v_created_anio AND p_mes < v_created_mes) THEN
+                        CONTINUE;
+                      END IF;
+                    END;
+                  END IF;
                  SELECT GREATEST(0, COALESCE(total_deuda,0)-COALESCE(saldo_favor,0)) INTO v_saldo_ant FROM estados_cuenta WHERE propietario_id=v_prop.id AND anio=v_anio_anterior AND mes=v_mes_anterior;
                  IF v_saldo_ant IS NULL THEN v_saldo_ant:=0; END IF;
                  v_cuota_extra:=0;
@@ -127,28 +143,31 @@ export async function ensureMigrations(env) {
                  END IF;
                   v_presupuesto:=COALESCE(v_params.cuota_admon,0);
                   -- exclusivo: si valor>0 se ignora coef de ese inmueble
-                  v_sum_coef:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 THEN COALESCE(v_prop.coef_apto,0) ELSE 0 END
-                    + CASE WHEN COALESCE(v_prop.has_celda,false) AND COALESCE(v_prop.valor_celda,0)=0 THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END
-                    + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) AND COALESCE(v_prop.valor_cuarto_util,0)=0 THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END;
+                   v_sum_coef:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 THEN COALESCE(v_prop.coef_apto,0) ELSE 0 END
+                     + CASE WHEN COALESCE(v_prop.has_celda,false) AND COALESCE(v_prop.valor_celda,0)=0 THEN COALESCE(v_prop.coef_celda,0) ELSE 0 END
+                     + CASE WHEN COALESCE(v_prop.has_cuarto_util,false) AND COALESCE(v_prop.valor_cuarto_util,0)=0 THEN COALESCE(v_prop.coef_cuarto_util,0) ELSE 0 END
+                     + CASE WHEN COALESCE(v_prop.has_local,false) AND COALESCE(v_prop.valor_local,0)=0 THEN COALESCE(v_prop.coef_local,0) ELSE 0 END;
                    IF v_sum_coef > 0 AND v_presupuesto > 0 THEN
                       v_vapto:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2) ELSE 0 END;
                       v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) THEN CASE WHEN COALESCE(v_prop.valor_celda,0)>0 THEN ROUND(COALESCE(v_prop.valor_celda,0),2) ELSE ROUND(v_presupuesto * COALESCE(v_prop.coef_celda,0)/100,2) END ELSE 0 END;
-                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN CASE WHEN COALESCE(v_prop.valor_cuarto_util,0)>0 THEN ROUND(COALESCE(v_prop.valor_cuarto_util,0),2) ELSE ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100,2) END ELSE 0 END;
-                      v_total_cuota:=ROUND(COALESCE(v_vapto,0) + COALESCE(v_vcelda,0) + COALESCE(v_vcuarto,0),2);
-                   ELSIF COALESCE(v_prop.valor_celda,0)>0 OR COALESCE(v_prop.valor_cuarto_util,0)>0 THEN
-                      v_vapto:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 AND v_presupuesto>0 THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2) ELSE 0 END;
-                      v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) AND COALESCE(v_prop.valor_celda,0)>0 THEN ROUND(COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
-                      v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) AND COALESCE(v_prop.valor_cuarto_util,0)>0 THEN ROUND(COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
-                      v_total_cuota:=ROUND(COALESCE(v_vapto,0) + COALESCE(v_vcelda,0) + COALESCE(v_vcuarto,0),2);
+                       v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) THEN CASE WHEN COALESCE(v_prop.valor_cuarto_util,0)>0 THEN ROUND(COALESCE(v_prop.valor_cuarto_util,0),2) ELSE ROUND(v_presupuesto * COALESCE(v_prop.coef_cuarto_util,0)/100,2) END ELSE 0 END;
+                       v_vlocal:=CASE WHEN COALESCE(v_prop.has_local,false) THEN CASE WHEN COALESCE(v_prop.valor_local,0)>0 THEN ROUND(COALESCE(v_prop.valor_local,0),2) ELSE ROUND(v_presupuesto * COALESCE(v_prop.coef_local,0)/100,2) END ELSE 0 END;
+                       v_total_cuota:=ROUND(COALESCE(v_vapto,0) + COALESCE(v_vcelda,0) + COALESCE(v_vcuarto,0) + COALESCE(v_vlocal,0),2);
+                    ELSIF COALESCE(v_prop.valor_celda,0)>0 OR COALESCE(v_prop.valor_cuarto_util,0)>0 OR COALESCE(v_prop.valor_local,0)>0 THEN
+                       v_vapto:=CASE WHEN COALESCE(v_prop.coef_apto,0)>0 AND v_presupuesto>0 THEN ROUND(v_presupuesto * COALESCE(v_prop.coef_apto,0)/100,2) ELSE 0 END;
+                       v_vcelda:=CASE WHEN COALESCE(v_prop.has_celda,false) AND COALESCE(v_prop.valor_celda,0)>0 THEN ROUND(COALESCE(v_prop.valor_celda,0),2) ELSE 0 END;
+                       v_vcuarto:=CASE WHEN COALESCE(v_prop.has_cuarto_util,false) AND COALESCE(v_prop.valor_cuarto_util,0)>0 THEN ROUND(COALESCE(v_prop.valor_cuarto_util,0),2) ELSE 0 END;
+                       v_vlocal:=CASE WHEN COALESCE(v_prop.has_local,false) AND COALESCE(v_prop.valor_local,0)>0 THEN ROUND(COALESCE(v_prop.valor_local,0),2) ELSE 0 END;
+                       v_total_cuota:=ROUND(COALESCE(v_vapto,0) + COALESCE(v_vcelda,0) + COALESCE(v_vcuarto,0) + COALESCE(v_vlocal,0),2);
                       IF v_total_cuota=0 THEN v_total_cuota:=COALESCE(v_prop.cuota_total, v_prop.cuota_admon, 0); END IF;
                    ELSE
                        v_total_cuota:=COALESCE(v_prop.cuota_total, v_prop.cuota_admon, 0);
                        v_vapto:=v_total_cuota; v_vcelda:=0; v_vcuarto:=0;
                    END IF;
                   BEGIN
-                      INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
-                      VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_saldo_ant, 0, 0, v_fecha_vcto)
-                      ON CONFLICT (propietario_id, anio, mes) DO UPDATE SET pago_actual = EXCLUDED.pago_actual, valor_apto = EXCLUDED.valor_apto, valor_celda = EXCLUDED.valor_celda, valor_cuarto_util = EXCLUDED.valor_cuarto_util;
+                       INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, valor_local, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
+                       VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_vapto, v_vcelda, v_vcuarto, v_vlocal, v_saldo_ant, 0, 0, v_fecha_vcto)
+                       ON CONFLICT (propietario_id, anio, mes) DO UPDATE SET pago_actual = EXCLUDED.pago_actual, valor_apto = EXCLUDED.valor_apto, valor_celda = EXCLUDED.valor_celda, valor_cuarto_util = EXCLUDED.valor_cuarto_util, valor_local = EXCLUDED.valor_local;
                   EXCEPTION WHEN undefined_column THEN
                       INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, saldo_anterior, saldo_favor, intereses, fecha_vencimiento)
                       VALUES (v_prop.id, p_anio, p_mes, v_total_cuota + v_cuota_extra, v_saldo_ant, 0, 0, v_fecha_vcto)
@@ -159,8 +178,31 @@ export async function ensureMigrations(env) {
              RETURN v_count;
          END; $$ LANGUAGE plpgsql;
          `);
-        // Activar urbanizaciones existentes que ya estaban admitidas
-        await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
+          // Activar urbanizaciones existentes que ya estaban admitidas
+          await sql.unsafe(`UPDATE urbanizaciones SET plan_activo = TRUE, fecha_expiracion = NOW() + INTERVAL '1 year' WHERE estado = 'admitida' AND (plan_activo IS FALSE OR plan_activo IS NULL)`);
+
+          // Trigger para recalcular total_deuda automáticamente
+          await sql.unsafe(`
+            CREATE OR REPLACE FUNCTION calcular_total_deuda()
+            RETURNS TRIGGER AS $$
+            BEGIN
+              NEW.total_deuda := GREATEST(0, NEW.pago_actual + NEW.saldo_anterior + NEW.intereses - NEW.saldo_favor);
+              RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+          `);
+          await sql.unsafe(`DROP TRIGGER IF EXISTS trg_calcular_total_deuda ON estados_cuenta`);
+          await sql.unsafe(`CREATE TRIGGER trg_calcular_total_deuda BEFORE UPDATE ON estados_cuenta FOR EACH ROW EXECUTE FUNCTION calcular_total_deuda()`);
+
+       // Limpieza: eliminar estados anteriores a created_at (propietarios registrados después)
+       await sql.unsafe(`
+         DELETE FROM estados_cuenta ec
+         USING propietarios p
+         WHERE ec.propietario_id = p.id
+           AND p.created_at IS NOT NULL
+           AND (ec.anio < EXTRACT(YEAR FROM p.created_at)
+                OR (ec.anio = EXTRACT(YEAR FROM p.created_at) AND ec.mes < EXTRACT(MONTH FROM p.created_at)))
+       `);
 
         // Tabla: temp_pdfs (para servir PDFs temporales)
         await sql.unsafe(`CREATE TABLE IF NOT EXISTS temp_pdfs (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), pdf_data BYTEA NOT NULL, codigo VARCHAR(20) DEFAULT 'documento', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL)`);

@@ -1,5 +1,13 @@
 window.NassauPagos = {
-    async renderPage() {
+     toggleHelp(e) {
+         e.stopPropagation();
+         const icon = e.currentTarget;
+         const tip = icon.nextElementSibling;
+         const wasOpen = tip.classList.contains('open');
+         document.querySelectorAll('.help-tip.open').forEach(t => t.classList.remove('open'));
+         if (!wasOpen) tip.classList.add('open');
+     },
+     async renderPage() {
         const html = `
             <div class="header-actions">
                 <h2>Pagos</h2>
@@ -16,9 +24,12 @@ window.NassauPagos = {
                     <tbody><tr><td colspan="5" class="text-center">Seleccione un propietario para ver sus pagos</td></tr></tbody>
                 </table>
             </div>`;
-        document.getElementById('page-pagos').innerHTML = html;
-        await this.loadPropietariosSelector();
-    },
+document.getElementById('page-pagos').innerHTML = html;
+         document.addEventListener('click', (e) => {
+             document.querySelectorAll('.help-tip.open').forEach(t => t.classList.remove('open'));
+         });
+         await this.loadPropietariosSelector();
+     },
     async loadPropietariosSelector() {
         try {
             const props = await window.NassauAPI.apiGet('/propietarios');
@@ -70,18 +81,16 @@ window.NassauPagos = {
                     <div class="form-group"><label>Monto</label><input type="number" id="pago-monto" required></div>
                     <div class="form-group"><label>Fecha de Pago</label><input type="date" id="pago-fecha" required value="${new Date().toISOString().split('T')[0]}"></div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Tipo de Pago</label>
-                        <select id="pago-tipo">
-                            <option value="cuota_regular">Cuota Regular</option>
-                            <option value="cuota_extra">Cuota Extra</option>
-                            <option value="interes">Intereses</option>
-                            <option value="abono">Abono</option>
-                        </select>
-                    </div>
-                    <div class="form-group"><label>Comprobante</label><input type="text" id="pago-comprobante"></div>
-                </div>
+<div class="form-row">
+                     <div class="form-group"><label>Tipo de Pago</label><span class="help-icon" onclick="window.NassauPagos.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 40: Tipo de pago: Cuota Regular (cuota mensual de administración), Cuota Extra (aprobada por asamblea), Intereses (mora por mora), Abono (pago parcial anticipado).</span><select id="pago-tipo">
+                             <option value="cuota_regular">Cuota Regular</option>
+                             <option value="cuota_extra">Cuota Extra</option>
+                             <option value="interes">Intereses</option>
+                             <option value="abono">Abono</option>
+                         </select>
+                     </div>
+                     <div class="form-group"><label>Comprobante</label><span class="help-icon" onclick="window.NassauPagos.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 44: Comprobante de pago (transferencia, efectivo o nota de crédito) que respalda el pago de la cuota de administración y sus intereses.</span><input type="text" id="pago-comprobante"></div>
+                 </div>
                 <div class="form-group"><label>Descripción</label><input type="text" id="pago-desc"></div>
                 <div class="form-actions">
                     <button type="button" class="btn-secondary" onclick="window.NassauApp.closeModal()">Cancelar</button>

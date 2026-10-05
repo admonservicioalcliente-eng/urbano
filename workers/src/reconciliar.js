@@ -92,12 +92,13 @@ export async function reconciliarPagos(env, propietarioId) {
   }
 
   // 3. Excedente de pago por encima de toda la deuda → saldo a favor del último
-  //    estado abierto (crédito), para que siga apareciendo en el estado de cuenta.
+  //    estado abierto (crédito), para que el PDF pueda calcular el saldo a favor.
   if (aplicado < totalPagado && estados.length) {
     const lastAbierto = [...estados].reverse().find(e => !e.cerrado) || estados[estados.length - 1];
+    const excedente = totalPagado - aplicado;
     await query(env,
       `UPDATE estados_cuenta SET saldo_favor = saldo_favor + $1 WHERE id = $2`,
-      [totalPagado - aplicado, lastAbierto.id]
+      [excedente, lastAbierto.id]
     );
   }
 

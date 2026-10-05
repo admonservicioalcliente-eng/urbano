@@ -22,7 +22,7 @@ window.NassauEstados = {
                         <button class="btn-primary" onclick="window.NassauEstados.generarCuentaCobro()">Generar Cuenta de Cobro</button>
                     </div>
                     <table class="premium-table" id="estados-table">
-                        <thead><tr><th>Mes</th><th>Apto</th><th>Celda</th><th>Cuarto Útil</th><th>Cuota Total</th><th>Saldo Anterior</th><th>Días Mora</th><th>Intereses</th><th>Pagado</th><th>Total Deuda</th><th>Estado</th></tr></thead>
+                        <thead><tr><th>Mes</th><th>Apto</th><th>Celda</th><th>Cuarto Útil</th><th>Local</th><th>Cuota Total</th><th>Saldo Anterior</th><th>Días Mora</th><th>Intereses</th><th>Pagado</th><th>Total Deuda</th><th>Estado</th></tr></thead>
                         <tbody></tbody>
                     </table>
                     <div id="estado-desglose-resumen" style="margin-top:10px; font-size:0.85rem; color:var(--text-secondary);"></div>
@@ -76,24 +76,26 @@ window.NassauEstados = {
                 document.getElementById('estado-desglose-resumen').innerHTML = '';
             } else {
                 const mesNames = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-                let sumApto=0, sumCelda=0, sumCuarto=0, sumCuota=0;
+                let sumApto=0, sumCelda=0, sumCuarto=0, sumLocal=0, sumCuota=0;
                 tbody.innerHTML = data.map(e => {
                     const deudaMes = Number(e.total_deuda || 0);
                     const badge = e.cerrado ? 'activo' : (deudaMes > 0 ? 'moroso' : 'inactivo');
-                    const estadoLabel = e.cerrado ? 'Cerrado' : (deudaMes > 0 ? 'Pendiente' : 'Al d\u00eda');
-                    const sumDesglose = (Number(e.valor_apto)||0)+(Number(e.valor_celda)||0)+(Number(e.valor_cuarto_util)||0);
+                    const estadoLabel = e.cerrado ? 'Cerrado' : (deudaMes > 0 ? 'Pendiente' : 'Al día');
+                    const sumDesglose = (Number(e.valor_apto)||0)+(Number(e.valor_celda)||0)+(Number(e.valor_cuarto_util)||0)+(Number(e.valor_local)||0);
                     const hasDesglose = sumDesglose > 0;
                     const vApto = hasDesglose ? (Number(e.valor_apto)||0) : Number(e.pago_actual)||0;
                     const vCelda = hasDesglose ? (Number(e.valor_celda)||0) : 0;
                     const vCuarto = hasDesglose ? (Number(e.valor_cuarto_util)||0) : 0;
-                    const totalCuota = hasDesglose ? (vApto+vCelda+vCuarto) : Number(e.pago_actual)||0;
-                    if (!e.cerrado) { sumApto+=vApto; sumCelda+=vCelda; sumCuarto+=vCuarto; sumCuota+=totalCuota; }
+                    const vLocal = hasDesglose ? (Number(e.valor_local)||0) : 0;
+                    const totalCuota = hasDesglose ? (vApto+vCelda+vCuarto+vLocal) : Number(e.pago_actual)||0;
+                    if (!e.cerrado) { sumApto+=vApto; sumCelda+=vCelda; sumCuarto+=vCuarto; sumLocal+=vLocal; sumCuota+=totalCuota; }
                     return `
                     <tr>
                         <td>${mesNames[e.mes] || e.mes}</td>
                         <td>$${vApto.toLocaleString()}</td>
                         <td>${vCelda?`$${vCelda.toLocaleString()}`:'—'}</td>
                         <td>${vCuarto?`$${vCuarto.toLocaleString()}`:'—'}</td>
+                        <td>${vLocal?`$${vLocal.toLocaleString()}`:'—'}</td>
                         <td><b>$${totalCuota.toLocaleString()}</b></td>
                         <td>$${Number(e.saldo_anterior).toLocaleString()}</td>
                         <td>${e.dias_mora || 0}</td>
@@ -106,9 +108,9 @@ window.NassauEstados = {
                 // resumen en una sola línea si debe varios meses
                 const pendientes = data.filter(e=>!e.cerrado && Number(e.total_deuda)>0);
                 if (pendientes.length > 1) {
-                    document.getElementById('estado-desglose-resumen').innerHTML = `<b>Resumen ${pendientes.length} meses pendientes:</b> Apto $${sumApto.toLocaleString()} | Celda $${sumCelda.toLocaleString()} | Cuarto $${sumCuarto.toLocaleString()} | <b>Total cuotas $${sumCuota.toLocaleString()}</b>`;
+                    document.getElementById('estado-desglose-resumen').innerHTML = `<b>Resumen ${pendientes.length} meses pendientes:</b> Apto $${sumApto.toLocaleString()} | Celda $${sumCelda.toLocaleString()} | Cuarto $${sumCuarto.toLocaleString()} | Local $${sumLocal.toLocaleString()} | <b>Total cuotas $${sumCuota.toLocaleString()}</b>`;
                 } else if (pendientes.length === 1) {
-                    document.getElementById('estado-desglose-resumen').innerHTML = `<b>Desglose mes pendiente:</b> Apto $${sumApto.toLocaleString()}${sumCelda?` | Celda $${sumCelda.toLocaleString()}`:''}${sumCuarto?` | Cuarto $${sumCuarto.toLocaleString()}`:''}`;
+                    document.getElementById('estado-desglose-resumen').innerHTML = `<b>Desglose mes pendiente:</b> Apto $${sumApto.toLocaleString()}${sumCelda?` | Celda $${sumCelda.toLocaleString()}`:''}${sumCuarto?` | Cuarto $${sumCuarto.toLocaleString()}`:''}${sumLocal?` | Local $${sumLocal.toLocaleString()}`:''}`;
                 } else {
                     document.getElementById('estado-desglose-resumen').innerHTML = '';
                 }

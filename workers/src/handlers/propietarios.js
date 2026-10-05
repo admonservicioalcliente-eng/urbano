@@ -41,28 +41,31 @@ export async function handleGetOne(request, env, user, id) {
 function calcCuota(presupuesto, prop) {
   const hasCelda = !!prop.has_celda;
   const hasCuarto = !!prop.has_cuarto_util;
-  const hasApto = !!prop.has_apto || parseFloat(prop.coef_apto) > 0 || (!hasCelda && !hasCuarto);
+  const hasLocal = !!prop.has_local;
+  const hasApto = !!prop.has_apto || parseFloat(prop.coef_apto) > 0 || (!hasCelda && !hasCuarto && !hasLocal);
   const valC = hasCelda ? (parseFloat(prop.valor_celda) || 0) : 0;
   const valQ = hasCuarto ? (parseFloat(prop.valor_cuarto_util) || 0) : 0;
+  const valL = hasLocal ? (parseFloat(prop.valor_local) || 0) : 0;
   const coefApto = hasApto ? (parseFloat(prop.coef_apto) || 0) : 0;
   // exclusivo: si hay valor >0, coef de ese inmueble se ignora
   const coefCelda = hasCelda && valC === 0 ? (parseFloat(prop.coef_celda) || 0) : 0;
   const coefCuarto = hasCuarto && valQ === 0 ? (parseFloat(prop.coef_cuarto_util) || 0) : 0;
+  const coefLocal = hasLocal && valL === 0 ? (parseFloat(prop.coef_local) || 0) : 0;
   const cp = hasApto ? coefApto : 0;
-  const suma = cp + coefCelda + coefCuarto;
+  const suma = cp + coefCelda + coefCuarto + coefLocal;
   let base = 0;
   if (suma > 0 && presupuesto > 0) base = presupuesto * suma / 100;
-  else if (!hasCelda && !hasCuarto && !hasApto) base = parseFloat(prop.cuota_admon) || 0;
+  else if (!hasCelda && !hasCuarto && !hasLocal && !hasApto) base = parseFloat(prop.cuota_admon) || 0;
   else if (suma === 0 && presupuesto > 0) base = 0;
   else base = parseFloat(prop.cuota_admon) || 0;
-  return Math.round((base + valC + valQ) * 100) / 100;
+  return Math.round((base + valC + valQ + valL) * 100) / 100;
 }
 
 export async function handleCreate(request, env, user) {
   let body;
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
-  const { nombre_propietario, apartamento, no_celda, no_cuarto_util, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
+  const { nombre_propietario, apartamento, no_celda, no_cuarto_util, no_local, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, coef_local, valor_celda, valor_cuarto_util, valor_local, has_celda, has_cuarto_util, has_local } = body;
   if (!nombre_propietario || !apartamento) return err(400, 'Nombre y Apartamento son requeridos');
 
   if (estado === 'moroso' || estado === 'abono_inicial') {
@@ -108,19 +111,19 @@ export async function handleCreate(request, env, user) {
   try {
     const rows = await query(env,
       `INSERT INTO propietarios (
-        urbanizacion_id, nombre_propietario, apartamento, no_celda, no_cuarto_util,
+        urbanizacion_id, nombre_propietario, apartamento, no_celda, no_cuarto_util, no_local,
         cuota_admon, cuota_total, estado, numero_cuenta, modo_pago, telefono, email, notas,
         prefijo, mes_inicio, anio_inicio, abono_inicial,
-        coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
+        coef_apto, coef_celda, coef_cuarto_util, coef_local, valor_celda, valor_cuarto_util, valor_local, has_celda, has_cuarto_util, has_local
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) RETURNING *`,
       [
-        urbId, nombre_propietario, apartamento, no_celda || null, no_cuarto_util || null,
+        urbId, nombre_propietario, apartamento, no_celda || null, no_cuarto_util || null, no_local || null,
         cuotaManual, cuotaTotal, estado || 'activo', numero_cuenta || null, modo_pago || 'efectivo',
         telefono || null, email || null, notas || null,
         prefijo || null, mes_inicio || null, anio_inicio || null, parseFloat(abono_inicial) || 0,
-        parseFloat(coef_apto) || 0, parseFloat(coef_celda) || 0, parseFloat(coef_cuarto_util) || 0,
-        parseFloat(valor_celda) || 0, parseFloat(valor_cuarto_util) || 0,
-        !!has_celda, !!has_cuarto_util
+        parseFloat(coef_apto) || 0, parseFloat(coef_celda) || 0, parseFloat(coef_cuarto_util) || 0, parseFloat(coef_local) || 0,
+        parseFloat(valor_celda) || 0, parseFloat(valor_cuarto_util) || 0, parseFloat(valor_local) || 0,
+        !!has_celda, !!has_cuarto_util, !!has_local
       ]
     );
     const prop = rows[0];
@@ -150,7 +153,7 @@ export async function handleUpdate(request, env, user, id) {
     return err(403, 'Acceso denegado');
   }
 
-  const { nombre_propietario, apartamento, no_celda, no_cuarto_util, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, valor_celda, valor_cuarto_util, has_celda, has_cuarto_util } = body;
+  const { nombre_propietario, apartamento, no_celda, no_cuarto_util, no_local, cuota_admon, estado, numero_cuenta, modo_pago, telefono, email, notas, prefijo, mes_inicio, anio_inicio, abono_inicial, coef_apto, coef_celda, coef_cuarto_util, coef_local, valor_celda, valor_cuarto_util, valor_local, has_celda, has_cuarto_util, has_local } = body;
 
   // asegurar columnas
   try { await query(env, `SELECT coef_apto FROM propietarios LIMIT 0`); } catch {
@@ -174,7 +177,7 @@ export async function handleUpdate(request, env, user, id) {
   try { await query(env, `SELECT cuota_total FROM propietarios LIMIT 0`); } catch { await query(env, `ALTER TABLE propietarios ADD COLUMN IF NOT EXISTS cuota_total DECIMAL(12,2) DEFAULT 0`); }
   let cuotaManualUpd = cuota_admon;
   let cuotaTotalUpd = undefined;
-  const needRecalc = coef_apto !== undefined || coef_celda !== undefined || coef_cuarto_util !== undefined || valor_celda !== undefined || valor_cuarto_util !== undefined || has_celda !== undefined || has_cuarto_util !== undefined || cuota_admon !== undefined;
+  const needRecalc = coef_apto !== undefined || coef_celda !== undefined || coef_cuarto_util !== undefined || coef_local !== undefined || valor_celda !== undefined || valor_cuarto_util !== undefined || valor_local !== undefined || has_celda !== undefined || has_cuarto_util !== undefined || has_local !== undefined || cuota_admon !== undefined;
   if (needRecalc) {
     try {
       const curb = await query(env, `SELECT urbanizacion_id FROM propietarios WHERE id=$1`, [id]);
@@ -187,14 +190,17 @@ export async function handleUpdate(request, env, user, id) {
         coef_apto: coef_apto !== undefined ? coef_apto : curP.coef_apto,
         coef_celda: coef_celda !== undefined ? coef_celda : curP.coef_celda,
         coef_cuarto_util: coef_cuarto_util !== undefined ? coef_cuarto_util : curP.coef_cuarto_util,
+        coef_local: coef_local !== undefined ? coef_local : curP.coef_local,
         valor_celda: valor_celda !== undefined ? valor_celda : curP.valor_celda,
         valor_cuarto_util: valor_cuarto_util !== undefined ? valor_cuarto_util : curP.valor_cuarto_util,
+        valor_local: valor_local !== undefined ? valor_local : curP.valor_local,
         has_celda: has_celda !== undefined ? has_celda : curP.has_celda,
         has_cuarto_util: has_cuarto_util !== undefined ? has_cuarto_util : curP.has_cuarto_util,
+        has_local: has_local !== undefined ? has_local : curP.has_local,
         cuota_admon: cuota_admon !== undefined ? cuota_admon : curP.cuota_admon
       };
       const manual = parseFloat(merged.cuota_admon)||0;
-      const tieneCoef2 = (parseFloat(merged.coef_apto)>0 || (merged.has_celda && parseFloat(merged.coef_celda)>0) || (merged.has_cuarto_util && parseFloat(merged.coef_cuarto_util)>0) || (merged.has_celda && parseFloat(merged.valor_celda)>0) || (merged.has_cuarto_util && parseFloat(merged.valor_cuarto_util)>0));
+      const tieneCoef2 = (parseFloat(merged.coef_apto)>0 || (merged.has_celda && parseFloat(merged.coef_celda)>0) || (merged.has_cuarto_util && parseFloat(merged.coef_cuarto_util)>0) || (merged.has_local && parseFloat(merged.coef_local)>0) || (merged.has_celda && parseFloat(merged.valor_celda)>0) || (merged.has_cuarto_util && parseFloat(merged.valor_cuarto_util)>0) || (merged.has_local && parseFloat(merged.valor_local)>0));
       if (tieneCoef2 && presupuesto2>0) cuotaTotalUpd = calcCuota(presupuesto2, merged);
       else cuotaTotalUpd = manual;
       cuotaManualUpd = manual;
@@ -209,35 +215,42 @@ export async function handleUpdate(request, env, user, id) {
       apartamento = COALESCE($2, apartamento),
       no_celda = $3,
       no_cuarto_util = $4,
-      cuota_admon = COALESCE($5, cuota_admon),
-      cuota_total = COALESCE($6, cuota_total),
-      estado = COALESCE($7, estado),
-      numero_cuenta = $8,
-      modo_pago = COALESCE($9, modo_pago),
-      telefono = $10,
-      email = $11,
-      notas = $12,
-      prefijo = $13,
-      mes_inicio = $14,
-      anio_inicio = $15,
-      abono_inicial = COALESCE($16, abono_inicial),
-      coef_apto = COALESCE($17, coef_apto),
-      coef_celda = COALESCE($18, coef_celda),
-      coef_cuarto_util = COALESCE($19, coef_cuarto_util),
-      valor_celda = COALESCE($20, valor_celda),
-      valor_cuarto_util = COALESCE($21, valor_cuarto_util),
-      has_celda = COALESCE($22, has_celda),
-      has_cuarto_util = COALESCE($23, has_cuarto_util),
+      no_local = $5,
+      cuota_admon = COALESCE($6, cuota_admon),
+      cuota_total = COALESCE($7, cuota_total),
+      estado = COALESCE($8, estado),
+      numero_cuenta = $9,
+      modo_pago = COALESCE($10, modo_pago),
+      telefono = $11,
+      email = $12,
+      notas = $13,
+      prefijo = $14,
+      mes_inicio = $15,
+      anio_inicio = $16,
+      abono_inicial = COALESCE($17, abono_inicial),
+      coef_apto = COALESCE($18, coef_apto),
+      coef_celda = COALESCE($19, coef_celda),
+      coef_cuarto_util = COALESCE($20, coef_cuarto_util),
+      coef_local = COALESCE($21, coef_local),
+      valor_celda = COALESCE($22, valor_celda),
+      valor_cuarto_util = COALESCE($23, valor_cuarto_util),
+      valor_local = COALESCE($24, valor_local),
+      has_celda = COALESCE($25, has_celda),
+      has_cuarto_util = COALESCE($26, has_cuarto_util),
+      has_local = COALESCE($27, has_local),
       updated_at = NOW()
-    WHERE id = $24 RETURNING *`,
-    [nombre_propietario || null, apartamento || null, no_celda || null, no_cuarto_util || null, cuotaManualUpd === undefined ? null : (isNaN(parseFloat(cuotaManualUpd)) ? 0 : parseFloat(cuotaManualUpd)), cuotaTotalUpd === undefined ? null : (isNaN(parseFloat(cuotaTotalUpd)) ? 0 : parseFloat(cuotaTotalUpd)), estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
+    WHERE id = $28 RETURNING *`,
+    [nombre_propietario || null, apartamento || null, no_celda || null, no_cuarto_util || null, no_local || null, cuotaManualUpd === undefined ? null : (isNaN(parseFloat(cuotaManualUpd)) ? 0 : parseFloat(cuotaManualUpd)), cuotaTotalUpd === undefined ? null : (isNaN(parseFloat(cuotaTotalUpd)) ? 0 : parseFloat(cuotaTotalUpd)), estado || null, numero_cuenta || null, modo_pago || null, telefono || null, email || null, notas || null, prefijo || null, mes_inicio || null, anio_inicio || null, abono_inicial === undefined ? null : parseFloat(abono_inicial) || 0,
      coef_apto === undefined ? null : parseFloat(coef_apto) || 0,
      coef_celda === undefined ? null : parseFloat(coef_celda) || 0,
      coef_cuarto_util === undefined ? null : parseFloat(coef_cuarto_util) || 0,
+     coef_local === undefined ? null : parseFloat(coef_local) || 0,
      valor_celda === undefined ? null : parseFloat(valor_celda) || 0,
      valor_cuarto_util === undefined ? null : parseFloat(valor_cuarto_util) || 0,
+     valor_local === undefined ? null : parseFloat(valor_local) || 0,
      has_celda === undefined ? null : !!has_celda,
      has_cuarto_util === undefined ? null : !!has_cuarto_util,
+     has_local === undefined ? null : !!has_local,
      id]
   );
 
@@ -278,8 +291,16 @@ async function sembrarEstadosInicio(env, prop) {
   const estado = prop.estado;
   const mesInicio = parseInt(prop.mes_inicio);
   const anioInicio = parseInt(prop.anio_inicio);
-  if (estado !== 'moroso' && estado !== 'abono_inicial') return;
-  if (!mesInicio || !anioInicio) return;
+  if (estado !== 'moroso' && estado !== 'abono_inicio' && estado !== 'activo') return;
+  if (!mesInicio || !anioInicio) {
+    if (estado === 'activo' && prop.created_at) {
+      const created = new Date(prop.created_at);
+      prop.mes_inicio = created.getMonth() + 1;
+      prop.anio_inicio = created.getFullYear();
+    } else {
+      return;
+    }
+  }
 
   const hoy = new Date();
   const anioActual = hoy.getFullYear();
@@ -300,19 +321,24 @@ async function sembrarEstadosInicio(env, prop) {
     const hasA = !!(parseFloat(prop.coef_apto)>0);
     const hasC = !!prop.has_celda;
     const hasQ = !!prop.has_cuarto_util;
+    const hasL = !!prop.has_local;
     const valC_ = hasC ? parseFloat(prop.valor_celda)||0 : 0;
     const valQ_ = hasQ ? parseFloat(prop.valor_cuarto_util)||0 : 0;
+    const valL_ = hasL ? parseFloat(prop.valor_local)||0 : 0;
     const useCoefC = hasC && valC_ === 0;
     const useCoefQ = hasQ && valQ_ === 0;
-    if (presupuestoAnio !== null && (hasA || hasC || hasQ)) {
+    const useCoefL = hasL && valL_ === 0;
+    if (presupuestoAnio !== null && (hasA || hasC || hasQ || hasL)) {
       cuota = calcCuota(presupuestoAnio, { ...prop, has_apto: hasA });
       const cp = hasA ? parseFloat(prop.coef_apto)||0 : 0;
       const cc = useCoefC ? parseFloat(prop.coef_celda)||0 : 0;
       const cq = useCoefQ ? parseFloat(prop.coef_cuarto_util)||0 : 0;
+      const cl = useCoefL ? parseFloat(prop.coef_local)||0 : 0;
       const vApto = hasA ? presupuestoAnio * cp /100 : 0;
       const vCelda = hasC ? (valC_ > 0 ? valC_ : presupuestoAnio * cc /100) : 0;
       const vCuarto = hasQ ? (valQ_ > 0 ? valQ_ : presupuestoAnio * cq /100) : 0;
-      prop._desglose = { vApto: Math.round(vApto*100)/100, vCelda: Math.round(vCelda*100)/100, vCuarto: Math.round(vCuarto*100)/100 };
+      const vLocal = hasL ? (valL_ > 0 ? valL_ : presupuestoAnio * cl /100) : 0;
+      prop._desglose = { vApto: Math.round(vApto*100)/100, vCelda: Math.round(vCelda*100)/100, vCuarto: Math.round(vCuarto*100)/100, vLocal: Math.round(vLocal*100)/100 };
     } else {
       cuota = parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || 0;
       prop._desglose = { vApto: cuota, vCelda: 0, vCuarto: 0 };
@@ -321,11 +347,11 @@ async function sembrarEstadosInicio(env, prop) {
     let created;
     try {
       created = await query(env,
-        `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO estados_cuenta (propietario_id, anio, mes, pago_actual, valor_apto, valor_celda, valor_cuarto_util, valor_local)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (propietario_id, anio, mes) DO NOTHING
          RETURNING *`,
-        [prop.id, cursorAnio, cursorMes, cuota, prop._desglose?.vApto||cuota, prop._desglose?.vCelda||0, prop._desglose?.vCuarto||0]
+        [prop.id, cursorAnio, cursorMes, cuota, prop._desglose?.vApto||cuota, prop._desglose?.vCelda||0, prop._desglose?.vCuarto||0, prop._desglose?.vLocal||0]
       );
     } catch {
       created = await query(env,
