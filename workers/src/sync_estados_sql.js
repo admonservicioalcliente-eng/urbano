@@ -19,11 +19,11 @@ WITH deuda AS (
   GROUP BY p.id
 )
 UPDATE propietarios p
-SET estado = CASE WHEN d.deuda > 0.009 THEN 'moroso' ELSE 'activo' END,
+SET estado = (CASE WHEN d.deuda > 0.009 THEN 'moroso' ELSE 'activo' END)::estado_propietario,
     updated_at = NOW()
 FROM deuda d
 WHERE p.id = d.id
   AND p.estado NOT IN ('inactivo', 'abono_inicial')
-  AND p.estado IS DISTINCT FROM (CASE WHEN d.deuda > 0.009 THEN 'moroso' ELSE 'activo' END)
+  AND p.estado IS DISTINCT FROM (CASE WHEN d.deuda > 0.009 THEN 'moroso' ELSE 'activo' END)::estado_propietario
 RETURNING p.id, p.estado
 `;
