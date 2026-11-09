@@ -79,6 +79,30 @@ export default {
         return jsonResponse({ estados, migration, col, sync, syncEstadosState }, 200, env);
       }
 
+      // TEMPORAL: diagnóstico de deuda por propietario (doble conteo de saldo_anterior).
+      if (path === '/api/debug/estados-detalle' && method === 'GET') {
+        const { query } = await import('./db.js');
+        const ahora = new Date();
+        const anio = ahora.getUTCFullYear();
+        const mes = ahora.getUTCMonth() + 1;
+        const rows = await query(env, `
+          WITH per AS (
+            SELECT p.id, p.apartamento, p.estado,
+              COALESCE(SUM(GREATEST(0, ec.pago_actual + ec.saldo_anterior + ec.intereses - ec.saldo_favor))
+                FILTER (WHERE ec.cerrado = false AND (ec.anio < $1 OR (ec.anio = $1 AND ec.mes < $2))), 0) AS deuda_cum,
+              COALESCE(SUM(GREATEST(0, ec.pago_actual + ec.intereses - ec.saldo_favor))
+                FILTER (WHERE ec.cerrado = false AND (ec.anio < $1 OR (ec.anio = $1 AND ec.mes < $2))), 0) AS deuda_own,
+              COUNT(*) FILTER (WHERE ec.anio < $1 OR (ec.anio = $1 AND ec.mes < $2))::int AS periodos_prev,
+              COUNT(*) FILTER (WHERE ec.cerrado = false AND (ec.anio < $1 OR (ec.anio = $1 AND ec.mes < $2)))::int AS abiertos_prev
+            FROM propietarios p
+            LEFT JOIN estados_cuenta ec ON ec.propietario_id = p.id
+            GROUP BY p.id, p.apartamento, p.estado
+          )
+          SELECT * FROM per ORDER BY apartamento
+        `, [anio, mes]);
+        return jsonResponse({ anio, mes, rows }, 200, env);
+      }
+
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
