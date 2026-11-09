@@ -103,6 +103,21 @@ export default {
         return jsonResponse({ anio, mes, rows }, 200, env);
       }
 
+      // TEMPORAL: últimas cuentas de cobro por propietario (para validar el PDF).
+      if (path === '/api/debug/cuentas-latest' && method === 'GET') {
+        const { query } = await import('./db.js');
+        const rows = await query(env, `
+          SELECT DISTINCT ON (cc.propietario_id)
+            cc.propietario_id, p.apartamento, p.estado, cc.created_at,
+            cc.detalle_json->'periodos_pendientes' AS periodos,
+            cc.detalle_json->'totales' AS totales
+          FROM cuentas_cobro cc
+          JOIN propietarios p ON p.id = cc.propietario_id
+          ORDER BY cc.propietario_id, cc.created_at DESC
+        `);
+        return jsonResponse({ rows }, 200, env);
+      }
+
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
