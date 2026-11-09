@@ -36,6 +36,16 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // Servir assets estáticos ANTES de auth/DB. Con run_worker_first=true el
+    // Worker maneja también los assets y fuerza no-store para que un nuevo
+    // deploy se refleje de inmediato (sin caché de borde obsoleta).
+    if (!path.startsWith('/api/')) {
+      const assetRes = await env.ASSETS.fetch(request);
+      const headers = new Headers(assetRes.headers);
+      headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      return new Response(assetRes.body, { status: assetRes.status, statusText: assetRes.statusText, headers });
+    }
+
     try {
       await ensureMigrations(env);
 
@@ -344,12 +354,6 @@ if (res instanceof Response) return res;
         res = await paypalHandler.handleRenew(request, env);
       } else if (path.match(/^\/api\/paypal\/status\/[^/]+$/) && method === 'GET') {
         res = await paypalHandler.handleStatus(request, env, user, resourceId);
-      } else if (!path.startsWith('/api/')) {
-        // Serve static assets for non-API routes (force no-cache so HTML updates instantly)
-        const assetRes = await env.ASSETS.fetch(request);
-        const headers = new Headers(assetRes.headers);
-        headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-        return new Response(assetRes.body, { status: assetRes.status, statusText: assetRes.statusText, headers });
       } else {
         return errorResponse('Route not found', 404, env);
       }
