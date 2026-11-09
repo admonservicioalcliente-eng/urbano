@@ -309,6 +309,7 @@ export async function ensureMigrations(env) {
 // en migraciones antiguas y abortar el resto). Actualiza el estado de todos
 // los propietarios según su deuda hasta el mes anterior.
 let syncEstadosChecked = false;
+export const syncEstadosState = { checked: false, lastError: null };
 export async function ensureSyncEstados(env) {
   if (syncEstadosChecked) return;
   try {
@@ -326,6 +327,10 @@ export async function ensureSyncEstados(env) {
         console.log(`Sync estados propietarios: ${cambiados.length} actualizados`);
       }
       syncEstadosChecked = true;
+      syncEstadosState.checked = true;
     } finally { await sql.end(); }
-  } catch (e) { console.error('Sync estados error:', e.message); }
+  } catch (e) {
+    syncEstadosState.lastError = e.message;
+    console.error('Sync estados error:', e.message);
+  }
 }
