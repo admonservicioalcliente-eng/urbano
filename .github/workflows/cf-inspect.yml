@@ -13,14 +13,19 @@ jobs:
           ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -e
-          echo "== subdomain =="
-          curl -s -H "Authorization: Bearer $TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/subdomain"
+          api() { curl -s -H "Authorization: Bearer $TOKEN" "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT$1"; }
+
+          echo "== versions list =="
+          api "/workers/scripts/nassau-api/versions?per_page=5"
           echo
-          echo "== deployments nassau-api =="
-          curl -s -H "Authorization: Bearer $TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/nassau-api/deployments"
+          echo "== version f79b36c6 =="
+          api "/workers/scripts/nassau-api/versions/f79b36c6-c36a-4ffa-ad37-06585252e12f"
           echo
-          echo "== live asset etag/sha =="
-          curl -s -D - -o /dev/null "https://nassau-api.policomputo.workers.dev/js/modules/documentos.js" \
+          echo "== script settings =="
+          api "/workers/scripts/nassau-api/settings"
+          echo
+          echo "== live asset (fresh) =="
+          curl -s -D - -o /dev/null "https://nassau-api.policomputo.workers.dev/js/modules/documentos.js?x=$(date +%s%N)" \
             | grep -iE 'HTTP/|etag|cache-control|cf-cache-status|content-length'
+          echo "== live new-path probe =="
+          curl -s -o /dev/null -w '%{http_code} %{size_download}\n' "https://nassau-api.policomputo.workers.dev/deploy-check.txt"
