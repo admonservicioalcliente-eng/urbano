@@ -66,9 +66,17 @@ export default {
       // TEMPORAL: verificación de la sincronización masiva de estados.
       if (path === '/api/debug/estados-count' && method === 'GET') {
         const { query } = await import('./db.js');
+        const { SYNC_ESTADOS_SQL } = await import('./sync_estados_sql.js');
         const estados = await query(env, `SELECT estado, COUNT(*)::int AS total FROM propietarios GROUP BY estado ORDER BY estado`);
         const migration = await query(env, `SELECT name, applied_at FROM app_migrations WHERE name = 'sync_estados_2026_11'`);
-        return jsonResponse({ estados, migration }, 200, env);
+        const col = await query(env, `SELECT data_type, udt_name FROM information_schema.columns WHERE table_name = 'propietarios' AND column_name = 'estado'`);
+        let sync;
+        try {
+          const ahora = new Date();
+          const cambiados = await query(env, SYNC_ESTADOS_SQL, [ahora.getUTCFullYear(), ahora.getUTCMonth() + 1]);
+          sync = { ok: true, cambiados: cambiados.length };
+        } catch (e) { sync = { ok: false, error: e.message }; }
+        return jsonResponse({ estados, migration, col, sync }, 200, env);
       }
 
       if (path === '/api/admin/reproyectar' && method === 'POST') {
