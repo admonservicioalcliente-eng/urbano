@@ -1,0 +1,26 @@
+name: CF Inspect (temp)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query Cloudflare API
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          echo "== subdomain =="
+          curl -s -H "Authorization: Bearer $TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/subdomain"
+          echo
+          echo "== deployments nassau-api =="
+          curl -s -H "Authorization: Bearer $TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/workers/scripts/nassau-api/deployments"
+          echo
+          echo "== live asset etag/sha =="
+          curl -s -D - -o /dev/null "https://nassau-api.policomputo.workers.dev/js/modules/documentos.js" \
+            | grep -iE 'HTTP/|etag|cache-control|cf-cache-status|content-length'
