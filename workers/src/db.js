@@ -300,11 +300,24 @@ export async function ensureMigrations(env) {
         $$ LANGUAGE plpgsql;
       `);
 
-      // Sincronización única: actualizar estado de todos los propietarios
-      // según su deuda hasta el mes anterior (moroso <-> activo).
+      migrated = true;
+    } finally { await sql.end(); }
+  } catch (e) { console.error('Migration error:', e.message); }
+}
+
+// Sincronización única e independiente de ensureMigrations (que puede fallar
+// en migraciones antiguas y abortar el resto). Actualiza el estado de todos
+// los propietarios según su deuda hasta el mes anterior.
+let syncEstadosChecked = false;
+export async function ensureSyncEstados(env) {
+  if (syncEstadosChecked) return;
+  try {
+    const connectionString = env.HYPERDRIVE?.connectionString || env.DATABASE_URL;
+    const sql = postgres(connectionString, { max: 1 });
+    try {
       await sql.unsafe(`CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`);
-      const syncDone = await sql.unsafe(`SELECT 1 FROM app_migrations WHERE name = $1`, ['sync_estados_2026_11']);
-      if (!syncDone.length) {
+      const done = await sql.unsafe(`SELECT 1 FROM app_migrations WHERE name = $1`, ['sync_estados_2026_11']);
+      if (!done.length) {
         const ahora = new Date();
         const anio = ahora.getUTCFullYear();
         const mes = ahora.getUTCMonth() + 1;
@@ -312,8 +325,7 @@ export async function ensureMigrations(env) {
         await sql.unsafe(`INSERT INTO app_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING`, ['sync_estados_2026_11']);
         console.log(`Sync estados propietarios: ${cambiados.length} actualizados`);
       }
-
-      migrated = true;
+      syncEstadosChecked = true;
     } finally { await sql.end(); }
-  } catch (e) { console.error('Migration error:', e.message); }
+  } catch (e) { console.error('Sync estados error:', e.message); }
 }

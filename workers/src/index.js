@@ -1,5 +1,5 @@
 import { authMiddleware } from './auth.js';
-import { ensureMigrations } from './db.js';
+import { ensureMigrations, ensureSyncEstados } from './db.js';
 import * as authHandler from './handlers/auth.js';
 import * as propietariosHandler from './handlers/propietarios.js';
 import * as pagosHandler from './handlers/pagos.js';
@@ -48,6 +48,7 @@ export default {
 
     try {
       await ensureMigrations(env);
+      await ensureSyncEstados(env);
 
       if (path === '/api/debug/cleanup-estados' && method === 'POST') {
         const { query } = await import('./db.js');
