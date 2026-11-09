@@ -5,11 +5,15 @@
 // - Con deuda pendiente en meses anteriores => 'moroso'
 // - Sin deuda (o saldo a favor) hasta el mes anterior => 'activo'
 // - Se respetan los estados manuales 'inactivo' y 'abono_inicial'.
+//
+// Se usa el saldo PROPIO de cada mes (pago_actual + intereses - saldo_favor).
+// NO se suma saldo_anterior: es deuda acumulada que ya está representada por
+// los meses previos y sumarla duplicaba la deuda.
 export const SYNC_ESTADOS_SQL = `
 WITH deuda AS (
   SELECT p.id,
     COALESCE(SUM(
-      GREATEST(0, ec.pago_actual + ec.saldo_anterior + ec.intereses - ec.saldo_favor)
+      GREATEST(0, ec.pago_actual + ec.intereses - ec.saldo_favor)
     ) FILTER (
       WHERE ec.cerrado = false
         AND (ec.anio < $1 OR (ec.anio = $1 AND ec.mes < $2))

@@ -14,7 +14,7 @@ export async function deudaHastaMesAnterior(env, propietarioId) {
   const anioActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
   const rows = await query(env,
-    `SELECT COALESCE(SUM(total_deuda), 0) AS deuda
+    `SELECT COALESCE(SUM(GREATEST(0, pago_actual + intereses - saldo_favor)), 0) AS deuda
      FROM estados_cuenta
      WHERE propietario_id = $1
        AND cerrado = false

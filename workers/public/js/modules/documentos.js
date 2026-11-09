@@ -412,11 +412,20 @@ window.NassauDocumentos = {
             // anteriores al mes en curso. Con morosidad: los meses que la
             // presentan. El mes en curso se muestra aparte como cuota mensual.
             const pendientePeriodo = (p) => {
+                // Saldo propio del mes. Se excluye saldo_anterior porque ya está
+                // contabilizado en los meses previos (evita doble conteo) y se
+                // redondea a centavos para descartar residuos de punto flotante
+                // (ej. 0.000000000058) que marcaban como moroso a un propietario
+                // que en realidad estaba al día.
+                if (p.pago_actual !== undefined && p.pago_actual !== null) {
+                    const propio = (Number(p.pago_actual) || 0) + (Number(p.intereses) || 0);
+                    return Math.max(0, Math.round((propio - (Number(p.saldo_favor) || 0)) * 100) / 100);
+                }
                 if (p.pendiente !== undefined && p.pendiente !== null) {
-                    return Math.max(0, Number(p.pendiente) || 0);
+                    return Math.max(0, Math.round((Number(p.pendiente) || 0) * 100) / 100);
                 }
                 const base = Number(p.total_deuda ?? p.pago_actual ?? 0);
-                return Math.max(0, base - (Number(p.saldo_favor) || 0));
+                return Math.max(0, Math.round((base - (Number(p.saldo_favor) || 0)) * 100) / 100);
             };
             const esPeriodoAnterior = (p) => {
                 const pa = parseInt(p.anio) || anioActualNum;
@@ -426,14 +435,23 @@ window.NassauDocumentos = {
             const ordenarPeriodos = (a, b) =>
                 ((parseInt(a.anio) || 0) - (parseInt(b.anio) || 0)) ||
                 ((parseInt(a.mes) || 0) - (parseInt(b.mes) || 0));
-            const periodosConMora = todosPeriodos.filter(p => esPeriodoAnterior(p) && pendientePeriodo(p) > 0);
-            const hayMorosidad = periodosConMora.length > 0;
-            const periodosConcepto = (hayMorosidad
+            const periodosPrevios = todosPeriodos.filter(esPeriodoAnterior);
+            const deudaPeriodosPrevios = periodosPrevios.reduce((s, p) => s + pendientePeriodo(p), 0);
+            // Deuda previa neta según el backend (negativa = saldo a favor).
+            // Es la fuente principal para decidir si hay morosidad; el cálculo
+            // por periodo solo se usa como respaldo.
+            const deudaPreviaNeta = Number(t.deuda_anterior);
+            const hayMorosidad = Number.isFinite(deudaPreviaNeta)
+                ? deudaPreviaNeta > 0.009
+                : deudaPeriodosPrevios > 0.009;
+            const periodosConMora = periodosPrevios.filter(p => pendientePeriodo(p) > 0.009);
+            const ultimosTresPrevios = periodosPrevios
+                .filter(p => Number(p.pago_actual || 0) > 0)
+                .sort(ordenarPeriodos)
+                .slice(-3);
+            const periodosConcepto = (hayMorosidad && periodosConMora.length
                 ? periodosConMora
-                : todosPeriodos
-                    .filter(p => esPeriodoAnterior(p) && Number(p.pago_actual || 0) > 0)
-                    .sort(ordenarPeriodos)
-                    .slice(-3)
+                : ultimosTresPrevios
             ).sort(ordenarPeriodos);
 
             const todasLasCuotas = [];

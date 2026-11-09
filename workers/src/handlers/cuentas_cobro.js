@@ -268,11 +268,15 @@ const detalleJson = {
     desglose_cuota: propContacto.desglose,
     periodos_pendientes: ecs.map(e => {
       const base = parseFloat(e.pago_actual) + parseFloat(e.saldo_anterior) + parseFloat(e.intereses);
+      // Saldo propio del periodo (sin saldo_anterior, que ya está incluido en
+      // los meses previos). Se redondea para evitar residuos de punto flotante
+      // que hacían aparecer un mes como pendiente aunque estuviera pagado.
+      const basePropio = parseFloat(e.pago_actual) + parseFloat(e.intereses);
       const favor = parseFloat(e.saldo_favor) || 0;
       const montoAplicado = favor;
       const pagado = montoAplicado;
-      const saldo = Math.max(0, base - montoAplicado);
-      const cerrado = saldo === 0 && base > 0;
+      const saldo = Math.max(0, Math.round((basePropio - montoAplicado) * 100) / 100);
+      const cerrado = saldo === 0 && basePropio > 0;
       return {
         anio: e.anio,
         mes: e.mes,
