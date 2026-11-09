@@ -4,6 +4,7 @@
 // cubierta, por lo que si los pagos dejan el total deuda en cero los meses
 // pendientes quedan también en cero.
 import { query } from './db.js';
+import { SYNC_ESTADOS_SQL } from './sync_estados_sql.js';
 
 // Deuda pendiente con corte al mes anterior. La cuota del mes en curso no
 // cuenta como mora: un propietario que ya pagó todo hasta el mes anterior
@@ -35,6 +36,16 @@ export async function actualizarEstadoPropietario(env, propietarioId) {
     [nuevoEstado, propietarioId]
   );
   return nuevoEstado;
+}
+
+// Sincroniza de una sola vez el estado de TODOS los propietarios según su
+// deuda hasta el mes anterior. Devuelve cuántos cambiaron de estado.
+export async function sincronizarEstadosPropietarios(env) {
+  const ahora = new Date();
+  const anio = ahora.getUTCFullYear();
+  const mes = ahora.getUTCMonth() + 1;
+  const rows = await query(env, SYNC_ESTADOS_SQL, [anio, mes]);
+  return { actualizados: rows.length, propietarios: rows };
 }
 
 export async function reconciliarPagos(env, propietarioId) {

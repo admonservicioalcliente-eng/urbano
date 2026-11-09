@@ -1,5 +1,6 @@
 // db.js — PostgreSQL connection via Cloudflare Hyperdrive (using postgres.js)
 import postgres from 'postgres';
+import { SYNC_ESTADOS_SQL } from './sync_estados_sql.js';
 
 /**
  * Convenience wrapper for parameterized queries.
@@ -298,6 +299,19 @@ export async function ensureMigrations(env) {
         END;
         $$ LANGUAGE plpgsql;
       `);
+
+      // Sincronización única: actualizar estado de todos los propietarios
+      // según su deuda hasta el mes anterior (moroso <-> activo).
+      await sql.unsafe(`CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`);
+      const syncDone = await sql.unsafe(`SELECT 1 FROM app_migrations WHERE name = $1`, ['sync_estados_2026_11']);
+      if (!syncDone.length) {
+        const ahora = new Date();
+        const anio = ahora.getUTCFullYear();
+        const mes = ahora.getUTCMonth() + 1;
+        const cambiados = await sql.unsafe(SYNC_ESTADOS_SQL, [anio, mes]);
+        await sql.unsafe(`INSERT INTO app_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING`, ['sync_estados_2026_11']);
+        console.log(`Sync estados propietarios: ${cambiados.length} actualizados`);
+      }
 
       migrated = true;
     } finally { await sql.end(); }

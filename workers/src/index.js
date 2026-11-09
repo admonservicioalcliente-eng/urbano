@@ -62,6 +62,14 @@ export default {
         return jsonResponse({ deleted: result.length || result.count || 0 }, 200, env);
       }
 
+      // TEMPORAL: verificación de la sincronización masiva de estados.
+      if (path === '/api/debug/estados-count' && method === 'GET') {
+        const { query } = await import('./db.js');
+        const estados = await query(env, `SELECT estado, COUNT(*)::int AS total FROM propietarios GROUP BY estado ORDER BY estado`);
+        const migration = await query(env, `SELECT name, applied_at FROM app_migrations WHERE name = 'sync_estados_2026_11'`);
+        return jsonResponse({ estados, migration }, 200, env);
+      }
+
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
@@ -350,6 +358,10 @@ if (res instanceof Response) return res;
         else if (method === 'DELETE' && resourceId) res = await usuariosHandler.handleDelete(request, env, user, resourceId);
       } else if (path === '/api/admin/stats' && method === 'GET') {
         res = await superadminHandler.handleGetStats(request, env, user);
+      } else if (path === '/api/admin/sync-estados' && method === 'POST') {
+        if (user.rol !== 'superadmin') return errorResponse('Solo superadmin', 403, env);
+        const { sincronizarEstadosPropietarios } = await import('./reconciliar.js');
+        res = jsonResponse(await sincronizarEstadosPropietarios(env), 200, env);
       } else if (path === '/api/paypal/renew' && method === 'POST') {
         res = await paypalHandler.handleRenew(request, env);
       } else if (path.match(/^\/api\/paypal\/status\/[^/]+$/) && method === 'GET') {
