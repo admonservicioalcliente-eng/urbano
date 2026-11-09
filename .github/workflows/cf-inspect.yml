@@ -15,17 +15,23 @@ jobs:
           set -e
           api() { curl -s -H "Authorization: Bearer $TOKEN" "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT$1"; }
 
-          echo "== versions list =="
-          api "/workers/scripts/nassau-api/versions?per_page=5"
+          echo "== account =="
+          api "" | head -c 400
           echo
-          echo "== version f79b36c6 =="
-          api "/workers/scripts/nassau-api/versions/f79b36c6-c36a-4ffa-ad37-06585252e12f"
+          echo "== scripts =="
+          api "/workers/scripts" | head -c 2000
           echo
-          echo "== script settings =="
-          api "/workers/scripts/nassau-api/settings"
+          echo "== deployments top =="
+          api "/workers/scripts/nassau-api/deployments?per_page=3" | head -c 2000
           echo
-          echo "== live asset (fresh) =="
-          curl -s -D - -o /dev/null "https://nassau-api.policomputo.workers.dev/js/modules/documentos.js?x=$(date +%s%N)" \
-            | grep -iE 'HTTP/|etag|cache-control|cf-cache-status|content-length'
-          echo "== live new-path probe =="
-          curl -s -o /dev/null -w '%{http_code} %{size_download}\n' "https://nassau-api.policomputo.workers.dev/deploy-check.txt"
+          echo "== deployed script markers =="
+          api "/workers/scripts/nassau-api" > /tmp/script.js
+          wc -c /tmp/script.js
+          grep -c "ASSETS.fetch" /tmp/script.js || true
+          grep -c "Missing Authorization header" /tmp/script.js || true
+          grep -c "periodosConcepto" /tmp/script.js || true
+          echo "== live probes =="
+          for p in "/" "/js/modules/documentos.js" "/deploy-check.txt"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://nassau-api.policomputo.workers.dev$p")
+            echo "$p -> $code"
+          done
