@@ -407,13 +407,41 @@ window.NassauDocumentos = {
 
             const rows = [];
 
+            // ── Concepto: meses a mostrar en el PDF ──────────────────────
+            // Al día (sin deuda hasta el mes anterior): solo los 3 meses
+            // anteriores al mes en curso. Con morosidad: los meses que la
+            // presentan. El mes en curso se muestra aparte como cuota mensual.
+            const pendientePeriodo = (p) => {
+                if (p.pendiente !== undefined && p.pendiente !== null) {
+                    return Math.max(0, Number(p.pendiente) || 0);
+                }
+                const base = Number(p.total_deuda ?? p.pago_actual ?? 0);
+                return Math.max(0, base - (Number(p.saldo_favor) || 0));
+            };
+            const esPeriodoAnterior = (p) => {
+                const pa = parseInt(p.anio) || anioActualNum;
+                const pm = parseInt(p.mes) || 0;
+                return pa < anioActualNum || (pa === anioActualNum && pm < mesActualNum);
+            };
+            const ordenarPeriodos = (a, b) =>
+                ((parseInt(a.anio) || 0) - (parseInt(b.anio) || 0)) ||
+                ((parseInt(a.mes) || 0) - (parseInt(b.mes) || 0));
+            const periodosConMora = todosPeriodos.filter(p => esPeriodoAnterior(p) && pendientePeriodo(p) > 0);
+            const hayMorosidad = periodosConMora.length > 0;
+            const periodosConcepto = (hayMorosidad
+                ? periodosConMora
+                : todosPeriodos
+                    .filter(p => esPeriodoAnterior(p) && Number(p.pago_actual || 0) > 0)
+                    .sort(ordenarPeriodos)
+                    .slice(-3)
+            ).sort(ordenarPeriodos);
+
             const todasLasCuotas = [];
-            (detalle?.periodos_pendientes || []).forEach(p => {
+            periodosConcepto.forEach(p => {
                 const mesLabel = mesNames[p.mes] || `Mes ${p.mes}`;
-                const anio = p.anio || new Date().getFullYear();
-                const esMesActual = parseInt(p.mes) === new Date().getMonth() + 1 && parseInt(p.anio) === new Date().getFullYear();
+                const anio = p.anio || anioActualNum;
                 const cuotaMes = Number(p.pago_actual || 0);
-                if (cuotaMes > 0 && !esMesActual) {
+                if (cuotaMes > 0) {
                     const estado = p.cerrado ? 'Pagado' : 'Pendiente';
                     todasLasCuotas.push({
                         label: `Cuota de Administración - ${mesLabel} ${anio}`,
@@ -428,7 +456,8 @@ window.NassauDocumentos = {
             });
 
             const desgloseHeader = detalle?.desglose_cuota || detalle?.propietario?.desglose || null;
-            // mostrar todos los meses pendientes (enero-agosto) en una sola línea por concepto
+            // Una línea por concepto; la lista ya viene filtrada (3 meses al día
+            // o solo los meses en mora).
             todasLasCuotas.forEach(r => {
                 if (y > b + 88) return;
                 let va = Number(r.valor_apto||0), vc = Number(r.valor_celda||0), vq = Number(r.valor_cuarto_util||0), vl = Number(r.valor_local||0);

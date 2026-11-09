@@ -1,6 +1,6 @@
 // handlers/pagos.js — Registros y visualización de pagos
 import { query } from '../db.js';
-import { reconciliarPagos } from '../reconciliar.js';
+import { reconciliarPagos, actualizarEstadoPropietario } from '../reconciliar.js';
 
 export async function handleGetAll(request, env, user) {
   const url = new URL(request.url);
@@ -134,17 +134,9 @@ export async function handleCreate(request, env, user) {
   await reconciliarPagos(env, propietario_id);
 
   // ── Auto-actualizar estado del propietario (activo / moroso) ────────────────
-  // Obtener sumatoria de deudas pendientes
-  const deudaRows = await query(env,
-    `SELECT COALESCE(SUM(total_deuda), 0) as deuda
-     FROM estados_cuenta
-     WHERE propietario_id = $1 AND cerrado = false`,
-    [propietario_id]
-  );
-  const deudaRestante = parseFloat(deudaRows[0].deuda);
-  const nuevoEstado = deudaRestante > 0 ? 'moroso' : 'activo';
-
-  await query(env, `UPDATE propietarios SET estado = $1 WHERE id = $2 AND estado <> 'inactivo'`, [nuevoEstado, propietario_id]);
+  // Se evalúa la deuda hasta el mes anterior: la cuota del mes en curso no
+  // convierte en moroso a quien ya pagó todo lo anterior.
+  await actualizarEstadoPropietario(env, propietario_id);
 
   return ok(pago, 201);
 }
@@ -172,16 +164,8 @@ export async function handleDelete(request, env, user, id) {
   // si la deuda ya no está cubierta.
   await reconciliarPagos(env, pago.propietario_id);
 
-  // Recalcular estado propietario
-  const deudaRows = await query(env,
-    `SELECT COALESCE(SUM(total_deuda), 0) as deuda
-     FROM estados_cuenta
-     WHERE propietario_id = $1 AND cerrado = false`,
-    [pago.propietario_id]
-  );
-  const deudaRestante = parseFloat(deudaRows[0].deuda);
-  const nuevoEstado = deudaRestante > 0 ? 'moroso' : 'activo';
-  await query(env, `UPDATE propietarios SET estado = $1 WHERE id = $2 AND estado <> 'inactivo'`, [nuevoEstado, pago.propietario_id]);
+  // Recalcular estado propietario con corte al mes anterior
+  await actualizarEstadoPropietario(env, pago.propietario_id);
 
   return ok({ message: 'Pago revertido correctamente' });
 }

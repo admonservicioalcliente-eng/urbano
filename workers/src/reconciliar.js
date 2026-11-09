@@ -5,6 +5,38 @@
 // pendientes quedan también en cero.
 import { query } from './db.js';
 
+// Deuda pendiente con corte al mes anterior. La cuota del mes en curso no
+// cuenta como mora: un propietario que ya pagó todo hasta el mes anterior
+// debe permanecer ACTIVO aunque la cuota del mes actual siga abierta.
+export async function deudaHastaMesAnterior(env, propietarioId) {
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+  const rows = await query(env,
+    `SELECT COALESCE(SUM(total_deuda), 0) AS deuda
+     FROM estados_cuenta
+     WHERE propietario_id = $1
+       AND cerrado = false
+       AND (anio < $2 OR (anio = $2 AND mes < $3))`,
+    [propietarioId, anioActual, mesActual]
+  );
+  return parseFloat(rows[0].deuda) || 0;
+}
+
+// Sincroniza el estado del propietario con su saldo hasta el mes anterior:
+// con deuda queda MOROSO; en cero (o a favor) pasa a ACTIVO. Se respetan los
+// estados manuales 'inactivo' y 'abono_inicial'.
+export async function actualizarEstadoPropietario(env, propietarioId) {
+  const deudaAnterior = await deudaHastaMesAnterior(env, propietarioId);
+  const nuevoEstado = deudaAnterior > 0.009 ? 'moroso' : 'activo';
+  await query(env,
+    `UPDATE propietarios SET estado = $1
+     WHERE id = $2 AND estado NOT IN ('inactivo', 'abono_inicial')`,
+    [nuevoEstado, propietarioId]
+  );
+  return nuevoEstado;
+}
+
 export async function reconciliarPagos(env, propietarioId) {
   // 1. Vincular pagos huérfanos (sin estado) a la deuda abierta más antigua
   //    o crear el estado del mes de la fecha del pago.
@@ -128,18 +160,8 @@ export async function reconciliarPagos(env, propietarioId) {
     }
   }
 
-  // 5. Estado del propietario: si ya no debe nada (cero o saldo a favor) pasa a
-  //    ACTIVO. Nunca se altera un propietario 'inactivo'.
-  const deudaRows = await query(env,
-    `SELECT COALESCE(SUM(total_deuda), 0) AS deuda
-     FROM estados_cuenta
-     WHERE propietario_id = $1 AND cerrado = false`,
-    [propietarioId]
-  );
-  if (parseFloat(deudaRows[0].deuda) <= 0) {
-    await query(env,
-      `UPDATE propietarios SET estado = 'activo' WHERE id = $1 AND estado <> 'inactivo'`,
-      [propietarioId]
-    );
-  }
+  // 5. Estado del propietario: si el saldo está en cero hasta el mes anterior
+  //    (sin contar la cuota del mes en curso) pasa de MOROSO a ACTIVO; si
+  //    sigue debiendo, queda MOROSO. Se respetan 'inactivo' y 'abono_inicial'.
+  await actualizarEstadoPropietario(env, propietarioId);
 }
