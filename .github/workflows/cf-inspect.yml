@@ -15,23 +15,18 @@ jobs:
           set -e
           api() { curl -s -H "Authorization: Bearer $TOKEN" "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT$1"; }
 
-          echo "== account =="
-          api "" | head -c 400
-          echo
-          echo "== scripts =="
-          api "/workers/scripts" | head -c 2000
-          echo
           echo "== deployments top =="
-          api "/workers/scripts/nassau-api/deployments?per_page=3" | head -c 2000
+          api "/workers/scripts/nassau-api/deployments?per_page=1" > /tmp/dep.json
+          cat /tmp/dep.json
           echo
-          echo "== deployed script markers =="
-          api "/workers/scripts/nassau-api" > /tmp/script.js
-          wc -c /tmp/script.js
-          grep -c "ASSETS.fetch" /tmp/script.js || true
-          grep -c "Missing Authorization header" /tmp/script.js || true
-          grep -c "periodosConcepto" /tmp/script.js || true
+          vid=$(grep -o '"version_id": *"[^"]*"' /tmp/dep.json | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+          echo "== version $vid =="
+          api "/workers/scripts/nassau-api/versions/$vid" > /tmp/ver.json
+          cat /tmp/ver.json
+          echo
           echo "== live probes =="
           for p in "/" "/js/modules/documentos.js" "/deploy-check.txt"; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "https://nassau-api.policomputo.workers.dev$p")
-            echo "$p -> $code"
+            echo "--- $p"
+            curl -s -D - -o /dev/null "https://nassau-api.policomputo.workers.dev$p" \
+              | grep -iE 'HTTP/|cache-control|cf-cache-status|etag|content-length'
           done
