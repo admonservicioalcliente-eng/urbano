@@ -165,7 +165,7 @@ export default {
       // Diagnóstico: requiere autenticación y rol superadmin.
       if ((path === '/api/debug/pagos' || path === '/api/debug/prop') && method === 'GET') {
         const authDbg = await authMiddleware(request, env);
-        if (authDbg.error) return errorResponse(authDbg.error, authDbg.status, env);
+        if (authDbg.error) return errorResponse(authDbg.error, authDbg.status || 401, env);
         if (authDbg.user.rol !== 'superadmin') return errorResponse('Solo superadmin', 403, env);
       }
 
