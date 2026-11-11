@@ -200,26 +200,6 @@ export default {
         return jsonResponse({ propietario: prop[0], estados }, 200, env);
       }
 
-      // TEMPORAL (solo lectura): diagnóstico de propietarios activos.
-      if (path === '/api/debug/activos-diag' && method === 'GET') {
-        const KEY = 'e65a8411eba84994b689965dffa4a598';
-        if (url.searchParams.get('key') !== KEY) return errorResponse('No autorizado', 401, env);
-        const { query } = await import('./db.js');
-        const rows = await query(env, `
-          SELECT u.nombre AS urbanizacion,
-                 p.apartamento, p.nombre_propietario, p.estado::text AS estado,
-                 p.created_at, p.mes_inicio, p.anio_inicio,
-                 COUNT(ec.id)::int AS num_estados,
-                 MIN(ec.anio * 100 + ec.mes) AS primer_estado,
-                 MAX(ec.anio * 100 + ec.mes) AS ultimo_estado
-          FROM propietarios p
-          JOIN urbanizaciones u ON u.id = p.urbanizacion_id
-          LEFT JOIN estados_cuenta ec ON ec.propietario_id = p.id
-          GROUP BY u.nombre, p.id, p.apartamento, p.nombre_propietario, p.estado, p.created_at, p.mes_inicio, p.anio_inicio
-          ORDER BY u.nombre, p.apartamento`);
-        return jsonResponse({ rows }, 200, env);
-      }
-
       // Public routes
       if (path === '/api/auth/login' && method === 'POST') {
         const res = await authHandler.handleLogin(request, env);
