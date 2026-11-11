@@ -536,9 +536,10 @@ export async function handleCreateCuotaAdmon(request, env, user) {
   mesEnCurso.credito_aplicado = creditoAplicado;
   const saldoAFavor = Math.round((creditoDisponible - creditoAplicado) * 100) / 100;
   const totalAPagar = Math.round((carteraPendiente + mesEnCurso.pendiente) * 100) / 100;
-  // Saldo total de la cuenta: cartera + mes en curso − saldo a favor.
+  // Estado de cuenta al cierre del mes anterior: cartera pendiente (deuda
+  // anterior) menos el crédito disponible. NO incluye el mes en curso.
   // Negativo = a favor del propietario (se imprime entre paréntesis).
-  const estadoCuenta = Math.round((totalAPagar - saldoAFavor) * 100) / 100;
+  const estadoCuenta = Math.round((carteraPendiente - creditoDisponible) * 100) / 100;
 
   // Datos de la urbanización
   const urbRows = await query(env,

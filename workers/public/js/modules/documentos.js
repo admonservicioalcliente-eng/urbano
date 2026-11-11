@@ -344,9 +344,14 @@ window.NassauDocumentos = {
         const boxGap = 3;
         const boxW = (RIGHT - M - boxGap * 3) / 4;
         const boxH = 13;
+        // Estado de cuenta al cierre del mes anterior: cartera pendiente menos
+        // el crédito disponible (saldo a favor no aplicado + aplicado al mes).
+        // No incluye el mes en curso.
         const estadoCuenta = (detalle?.estado_cuenta !== undefined && detalle?.estado_cuenta !== null)
             ? Number(detalle.estado_cuenta)
-            : (Number(detalle?.total_a_pagar) || 0) - (Number(detalle?.saldo_a_favor) || 0);
+            : (Number(detalle?.cartera_pendiente) || 0)
+                - (Number(detalle?.saldo_a_favor) || 0)
+                - (Number(detalle?.mes_en_curso?.credito_aplicado) || 0);
         const movBoxes = [
             { label: `Cuota ${mesNames[mov.mes] || ''} ${mov.anio || ''}`.trim(), value: money(mov.cuota) },
             { label: 'Pagos aplicados', value: Number(mov.pagos) > 0 ? `-${money(mov.pagos)}` : money(0) },
@@ -432,9 +437,8 @@ window.NassauDocumentos = {
         if (Number(cur.intereses) > 0) {
             row('Intereses causados', money(cur.intereses), { indent: 2 });
         }
-        if (Number(cur.credito_aplicado) > 0) {
-            row('Saldo a favor aplicado', `-${money(cur.credito_aplicado)}`, { indent: 2 });
-        }
+        // El crédito ya se refleja en la casilla "Estado de cuenta"; no se
+        // vuelve a descontar aquí para evitar doble conteo.
 
         // ── Total a pagar ──────────────────────────────────────────
         doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
