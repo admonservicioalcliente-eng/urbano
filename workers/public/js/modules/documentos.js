@@ -329,8 +329,42 @@ window.NassauDocumentos = {
         doc.text(data.propietario_apto || prop.apartamento || '', M + 24, b + 31);
         doc.line(M, b + 35, RIGHT, b + 35);
 
+        // ── Movimiento del mes pasado (casillas junto al destinatario) ──
+        const mov = detalle?.movimiento_mes_pasado || {};
+        let y0 = b + 40;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 150, 150);
+        doc.text('MOVIMIENTO DEL MES PASADO', M, y0);
+        doc.setTextColor(0, 0, 0);
+        y0 += 2.5;
+
+        const boxGap = 3;
+        const boxW = (RIGHT - M - boxGap * 2) / 3;
+        const boxH = 13;
+        const movBoxes = [
+            { label: `Cuota ${mesNames[mov.mes] || ''} ${mov.anio || ''}`.trim(), value: money(mov.cuota) },
+            { label: 'Pagos aplicados', value: Number(mov.pagos) > 0 ? `-${money(mov.pagos)}` : money(0) },
+            { label: 'Saldo del mes pasado', value: money(mov.saldo), highlight: true }
+        ];
+        movBoxes.forEach((bx, i) => {
+            const x = M + i * (boxW + boxGap);
+            if (bx.highlight) {
+                doc.setFillColor(232, 247, 247); doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
+            } else {
+                doc.setFillColor(248, 248, 248); doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.2);
+            }
+            doc.rect(x, y0, boxW, boxH, 'FD');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(90, 90, 90);
+            doc.text(bx.label, x + boxW / 2, y0 + 4, { align: 'center', maxWidth: boxW - 3 });
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
+            doc.text(bx.value, x + boxW / 2, y0 + 10, { align: 'center' });
+        });
+        doc.setTextColor(0, 0, 0);
+        y0 += boxH + 4;
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4);
+        doc.line(M, y0, RIGHT, y0);
+        y0 += 3;
+
         // Desglose de la cuota
-        let y0 = b + 37;
         const desglose = detalle?.desglose_cuota || prop.desglose || null;
         if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util || desglose.valor_local)) {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
@@ -363,15 +397,6 @@ window.NassauDocumentos = {
             doc.text(value, RIGHT - 12, y, { align: 'right' });
             y += opts.gap || 5;
         };
-
-        // ── Movimiento del mes pasado ──────────────────────────────
-        const mov = detalle?.movimiento_mes_pasado || {};
-        section('MOVIMIENTO DEL MES PASADO');
-        row(`Cuota de administración - ${mesNames[mov.mes] || ''} ${mov.anio || ''}`, money(mov.cuota), { indent: 2 });
-        row('Pagos aplicados', Number(mov.pagos) > 0 ? `-${money(mov.pagos)}` : money(0), { indent: 2 });
-        row('Saldo del mes pasado', money(mov.saldo), { indent: 2, bold: true });
-
-        y += 2;
 
         // ── Cuotas vencidas ────────────────────────────────────────
         section('CUOTAS VENCIDAS');
