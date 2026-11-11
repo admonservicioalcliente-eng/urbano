@@ -1,3 +1,30 @@
+// La tasa de mora se escribe con coma decimal (formato Colombia), pero
+// también se acepta punto. Internamente se normaliza a punto para la API.
+function parseTasaMora(raw) {
+    const txt = String(raw ?? '').trim();
+    if (!txt) return NaN;
+    // No se permite mezclar separadores (ej: "1.234,56").
+    if (txt.includes(',') && txt.includes('.')) return NaN;
+    const norm = txt.replace(',', '.');
+    if (!/^\d+(\.\d+)?$/.test(norm)) return NaN;
+    return Number(norm);
+}
+function formatTasaMora(valor) {
+    const n = Number(valor);
+    if (!Number.isFinite(n)) return '';
+    return String(n).replace('.', ',');
+}
+function validarTasaMora(raw) {
+    const n = parseTasaMora(raw);
+    if (!Number.isFinite(n)) {
+        return { ok: false, msg: 'Tasa de mora inválida. Use coma decimal, por ejemplo: 1,5' };
+    }
+    if (n < 0 || n > 99.9999) {
+        return { ok: false, msg: 'La tasa de mora debe estar entre 0 y 99,9999. Use coma decimal, por ejemplo: 1,5' };
+    }
+    return { ok: true, value: n };
+}
+
 window.NassauConfiguracion = {
      toggleHelp(e) {
          e.stopPropagation();
@@ -93,7 +120,7 @@ const params = await window.NassauAPI.apiGet('/parametros');
                     <td><span class="badge badge-activo" id="proximo-${p.id}">${proximo}</span></td>
                     <td>
                         <div class="config-dias-control">
-                            <input type="number" step="0.01" min="0" class="config-field config-tasa" style="width:80px;" id="tasa-${p.id}" value="${p.tasa_mora_mensual}">
+                            <input type="text" inputmode="decimal" autocomplete="off" class="config-field config-tasa" style="width:80px;" id="tasa-${p.id}" value="${formatTasaMora(p.tasa_mora_mensual)}" placeholder="Ej: 1,5">
                             <span class="config-suffix">%</span>
                         </div>
                     </td>
@@ -192,7 +219,7 @@ const html = `
                       <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="${cuotaExtraDur}" ${cuotaExtraVal > 0 ? '' : 'disabled'}></div>
                   </div>
                   <div class="form-row">
-<div class="form-group"><label>Tasa Mora (%)</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 42: Tasa de interés moratorio mensual sobre el valor de la cuota impaga.</span><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
+<div class="form-group"><label>Tasa Mora (%)</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 42: Tasa de interés moratorio mensual sobre el valor de la cuota impaga. Escríbala con coma decimal, por ejemplo: 1,5.</span><input type="text" inputmode="decimal" autocomplete="off" id="conf-tasa" required value="1,5" placeholder="Ej: 1,5"></div>
                        <div class="form-group"><label>Día Generación</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 40: Día del mes en que se genera la cuota de administración para ese período.</span><input type="number" id="conf-gen" required value="1" min="1" max="28"></div>
                   </div>
                   <div class="form-row">
@@ -236,6 +263,8 @@ async saveConfig(e) {
              if (ceanio) ceanio.value = 0;
              if (cedur) cedur.value = 0;
          }
+         const tasaCheck = validarTasaMora(document.getElementById('conf-tasa').value);
+         if (!tasaCheck.ok) { window.NassauApp.showToast(tasaCheck.msg, 'error'); return; }
          const data = {
              anio: document.getElementById('conf-anio').value,
              prefijo_comprobante: document.getElementById('conf-prefijo').value.trim().toUpperCase() || 'NAS',
@@ -244,7 +273,7 @@ async saveConfig(e) {
              cuota_extra_mes_inicio: showExtra ? parseInt(document.getElementById('conf-cemes').value) || 0 : 0,
              cuota_extra_anio_inicio: showExtra ? parseInt(document.getElementById('conf-ceanio').value) || 0 : 0,
              cuota_extra_duracion: showExtra ? parseInt(document.getElementById('conf-cedur').value) || 0 : 0,
-             tasa_mora_mensual: document.getElementById('conf-tasa').value,
+             tasa_mora_mensual: tasaCheck.value,
              dia_generacion_cuota: document.getElementById('conf-gen').value,
              dia_vencimiento_sin_mora: document.getElementById('conf-venc').value,
              dia_inicio_mora: document.getElementById('conf-mora').value,
@@ -301,9 +330,11 @@ async actualizarConfig(id, btn) {
          const cuotaAdmon = parseFloat(document.getElementById(`cuota-${id}`)?.value);
          const cuotaExtra = parseFloat(document.getElementById(`cuotaextra-${id}`).value) || 0;
          const showExtra = cuotaExtra > 0;
+         const tasaCheck = validarTasaMora(document.getElementById(`tasa-${id}`)?.value);
+         if (!tasaCheck.ok) { window.NassauApp.showToast(tasaCheck.msg, 'error'); return; }
          const data = {
              cuota_admon: isNaN(cuotaAdmon) ? undefined : cuotaAdmon,
-             tasa_mora_mensual: parseFloat(document.getElementById(`tasa-${id}`).value) || 0,
+             tasa_mora_mensual: tasaCheck.value,
              dia_generacion_cuota: parseInt(document.getElementById(`gen-${id}`).value) || 1,
              dia_vencimiento_sin_mora: parseInt(document.getElementById(`venc-${id}`).value) || 1,
              dia_inicio_mora: parseInt(document.getElementById(`mora-${id}`).value) || 1,

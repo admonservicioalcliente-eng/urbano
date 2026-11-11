@@ -1,6 +1,22 @@
 // handlers/parametros.js — Parámetros de año & generación de cuotas mensuales
 import { query } from '../db.js';
 
+// Acepta la tasa con coma o punto decimal (ej: "1,5" o "1.5").
+// Devuelve null cuando el valor no es un número válido, evitando que llegue
+// texto con coma a la columna numeric y provoque un error de base de datos.
+function parseTasaMora(valor) {
+  if (valor === undefined || valor === null || valor === '') return null;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : null;
+  const txt = String(valor).trim();
+  if (!txt) return null;
+  // No se permite mezclar separadores (ej: "1.234,56").
+  if (txt.includes(',') && txt.includes('.')) return null;
+  const norm = txt.replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(norm)) return null;
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : null;
+}
+
 export async function handleGet(request, env, user) {
   const url = new URL(request.url);
   let urbId = user.urbanizacion_id;
@@ -33,8 +49,12 @@ export async function handleCreate(request, env, user) {
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
   const { anio, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, prefijo_comprobante, cuota_admon, consecutivo_comprobante, mostrar_copia, cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion } = body;
-  if (!anio || tasa_mora_mensual === undefined) {
-    return err(400, 'Año y Tasa de mora son obligatorios');
+  const tasaMora = parseTasaMora(tasa_mora_mensual);
+  if (!anio || tasaMora === null) {
+    return err(400, 'Año y Tasa de mora son obligatorios. Use coma decimal, por ejemplo: 1,5');
+  }
+  if (tasaMora < 0 || tasaMora > 99.9999) {
+    return err(400, 'La tasa de mora debe estar entre 0 y 99,9999. Use coma decimal, por ejemplo: 1,5');
   }
 
   const cols = await query(env, `SELECT column_name FROM information_schema.columns WHERE table_name = 'parametros_anio' AND table_schema = 'public'`);
@@ -71,7 +91,7 @@ export async function handleCreate(request, env, user) {
           [
             user.urbanizacion_id,
             parseInt(anio),
-            parseFloat(tasa_mora_mensual),
+            tasaMora,
             parseInt(dia_generacion_cuota) || 1,
             parseInt(dia_vencimiento_sin_mora) || 5,
             parseInt(dia_inicio_mora) || 6,
@@ -95,6 +115,18 @@ export async function handleUpdate(request, env, user, id) {
   try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
 
   const { consecutivo_comprobante, tasa_mora_mensual, dia_generacion_cuota, dia_vencimiento_sin_mora, dia_inicio_mora, mostrar_copia, cuota_admon, cuota_extra, cuota_extra_mes_inicio, cuota_extra_anio_inicio, cuota_extra_duracion } = body;
+
+  // Validar la tasa antes de tocar la columna numeric. Acepta coma o punto.
+  let tasaMora = null;
+  if (tasa_mora_mensual !== undefined) {
+    tasaMora = parseTasaMora(tasa_mora_mensual);
+    if (tasaMora === null) {
+      return err(400, 'Tasa de mora inválida. Use coma decimal, por ejemplo: 1,5');
+    }
+    if (tasaMora < 0 || tasaMora > 99.9999) {
+      return err(400, 'La tasa de mora debe estar entre 0 y 99,9999. Use coma decimal, por ejemplo: 1,5');
+    }
+  }
 
   const consecutivo = consecutivo_comprobante === undefined ? null : parseInt(consecutivo_comprobante);
   if (consecutivo !== null && (isNaN(consecutivo) || consecutivo < 0)) return err(400, 'Consecutivo inválido');
@@ -143,7 +175,7 @@ export async function handleUpdate(request, env, user, id) {
         retroactivo_admon = retroactivo_admon + $8
       WHERE id = $9 AND (urbanizacion_id = $10 OR $11::boolean)
       RETURNING *`,
-     [consecutivo, tasa_mora_mensual === undefined ? null : parseFloat(tasa_mora_mensual), dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, cuota_admon === undefined ? null : parseFloat(cuota_admon), retroactivoDelta, id, user.urbanizacion_id, user.rol === 'superadmin', cuota_extra === undefined ? null : parseFloat(cuota_extra), cuota_extra_mes_inicio === undefined ? null : parseInt(cuota_extra_mes_inicio), cuota_extra_anio_inicio === undefined ? null : parseInt(cuota_extra_anio_inicio), cuota_extra_duracion === undefined ? null : parseInt(cuota_extra_duracion)]
+     [consecutivo, tasaMora, dia_generacion_cuota === undefined ? null : parseInt(dia_generacion_cuota), dia_vencimiento_sin_mora === undefined ? null : parseInt(dia_vencimiento_sin_mora), dia_inicio_mora === undefined ? null : parseInt(dia_inicio_mora), mostrar_copia === undefined ? null : mostrar_copia, cuota_admon === undefined ? null : parseFloat(cuota_admon), retroactivoDelta, id, user.urbanizacion_id, user.rol === 'superadmin', cuota_extra === undefined ? null : parseFloat(cuota_extra), cuota_extra_mes_inicio === undefined ? null : parseInt(cuota_extra_mes_inicio), cuota_extra_anio_inicio === undefined ? null : parseInt(cuota_extra_anio_inicio), cuota_extra_duracion === undefined ? null : parseInt(cuota_extra_duracion)]
     );
     if (!rows.length) return err(404, 'Registro de configuración no encontrado');
     return ok(rows[0]);
