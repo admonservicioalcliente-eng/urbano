@@ -522,18 +522,20 @@ export async function handleCreateCuotaAdmon(request, env, user) {
 
   // Cartera pendiente = deuda anterior al mes en curso
   const carteraPendiente = Math.round((movimientoMesPasado.saldo + totalCuotasVencidas) * 100) / 100;
-  const totalAPagar = Math.round((carteraPendiente + mesEnCurso.pendiente) * 100) / 100;
 
-  // Saldo a favor si los pagos superan todos los cargos
-  const totalCargos = Math.round(
-    periodos.reduce((s, p) => s + p.cuota + p.intereses, 0) * 100
+  // Crédito real ya asignado a los periodos (pagos que excedieron su cuota).
+  // Puede estar guardado en el último mes abierto cuando el mes en curso aún
+  // no existe (periodo virtual), por eso se toma de saldo_favor y no del
+  // total pagado contra el total de cargos.
+  const creditoDisponible = Math.round(
+    periodos.reduce((s, p) => s + Math.max(0, p.aplicado - (p.cuota + p.intereses)), 0) * 100
   ) / 100;
-  const pagosRows = await query(env,
-    `SELECT COALESCE(SUM(monto), 0) AS total FROM pagos WHERE propietario_id = $1`,
-    [propietario_id]
-  );
-  const totalPagos = parseFloat(pagosRows[0].total) || 0;
-  const saldoAFavor = Math.max(0, Math.round((totalPagos - totalCargos) * 100) / 100);
+  // El crédito se aplica primero al mes en curso (si alcanza a cubrirlo)
+  const creditoAplicado = Math.min(creditoDisponible, mesEnCurso.pendiente);
+  mesEnCurso.pendiente = Math.round((mesEnCurso.pendiente - creditoAplicado) * 100) / 100;
+  mesEnCurso.credito_aplicado = creditoAplicado;
+  const saldoAFavor = Math.round((creditoDisponible - creditoAplicado) * 100) / 100;
+  const totalAPagar = Math.round((carteraPendiente + mesEnCurso.pendiente) * 100) / 100;
 
   // Datos de la urbanización
   const urbRows = await query(env,

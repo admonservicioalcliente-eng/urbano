@@ -399,6 +399,9 @@ window.NassauDocumentos = {
         if (Number(cur.intereses) > 0) {
             row('Intereses causados', money(cur.intereses), { indent: 2 });
         }
+        if (Number(cur.credito_aplicado) > 0) {
+            row('Saldo a favor aplicado', `-${money(cur.credito_aplicado)}`, { indent: 2 });
+        }
 
         // ── Total a pagar ──────────────────────────────────────────
         doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
