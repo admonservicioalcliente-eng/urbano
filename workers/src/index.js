@@ -103,7 +103,7 @@ export default {
         const datos = propietarios.map(p => ({ ...p, periodos: porApto[p.apartamento] || [] }));
 
         return jsonResponse({
-          user, modo: 'urbanizacion',
+          user, modo: 'urbanizacion', resumen,
           total_propietarios: datos.length,
           total_intereses: datos.reduce((s, p) => s + Number(p.total_intereses || 0), 0),
           propietarios: datos
