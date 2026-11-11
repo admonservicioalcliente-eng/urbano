@@ -289,25 +289,26 @@ export async function handleDelete(request, env, user, id) {
 // hasta el mes actual inclusive (deuda histórica acumulada).
 async function sembrarEstadosInicio(env, prop) {
   const estado = prop.estado;
-  const mesInicio = parseInt(prop.mes_inicio);
-  const anioInicio = parseInt(prop.anio_inicio);
-  if (estado !== 'moroso' && estado !== 'abono_inicio' && estado !== 'activo') return;
-  if (!mesInicio || !anioInicio) {
-    if (estado === 'activo' && prop.created_at) {
-      const created = new Date(prop.created_at);
-      prop.mes_inicio = created.getMonth() + 1;
-      prop.anio_inicio = created.getFullYear();
-    } else {
-      return;
-    }
-  }
+  if (estado !== 'moroso' && estado !== 'abono_inicial' && estado !== 'activo') return;
 
   const hoy = new Date();
   const anioActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
 
-  let cursorAnio = anioInicio;
-  let cursorMes = mesInicio;
+  let cursorAnio;
+  let cursorMes;
+  if (estado === 'activo') {
+    // Un propietario activo solo recibe la cuota del mes en curso.
+    // No se generan meses retroactivos para no inventar deuda histórica.
+    cursorAnio = anioActual;
+    cursorMes = mesActual;
+  } else {
+    // Moroso / abono inicial: se siembra desde la fecha de inicio explícita.
+    cursorAnio = parseInt(prop.anio_inicio);
+    cursorMes = parseInt(prop.mes_inicio);
+    if (!cursorAnio || !cursorMes) return;
+  }
+
   const generados = [];
 
   while (cursorAnio < anioActual || (cursorAnio === anioActual && cursorMes <= mesActual)) {

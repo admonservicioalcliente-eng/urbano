@@ -199,6 +199,7 @@ window.NassauPropietarios = {
         const noLocal = p.no_local ?? '';
         const cuotaManual = p.cuota_admon != null && p.cuota_admon !== '' ? p.cuota_admon : '';
         const cuotaTotal = p.cuota_total != null && p.cuota_total !== '' ? p.cuota_total : '';
+        const fechaIngreso = p.created_at ? new Date(p.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '';
         return `
             <style>#prop-form{scrollbar-width:thin; scrollbar-color: orange #111;} #prop-form::-webkit-scrollbar{width:8px} #prop-form::-webkit-scrollbar-thumb{background:orange; border-radius:4px} #prop-form::-webkit-scrollbar-track{background:#111}</style>
             <form id="prop-form" onsubmit="window.NassauPropietarios.savePropietario(event)" style="max-height:70vh; overflow-y:auto; padding-right:6px;">
@@ -260,6 +261,11 @@ window.NassauPropietarios = {
                         </select>
                     </div>
                 </div>
+                ${fechaIngreso ? `
+                <div class="form-group"><label>Fecha de ingreso</label>
+                    <input type="text" id="prop-fecha-ingreso" value="${fechaIngreso}" readonly style="background:#222; color:#fff; cursor:default;">
+                    <small style="color:var(--text-secondary); font-size:0.78rem;">Fecha de registro del propietario en el sistema.</small>
+                </div>` : ''}
                 <div id="prop-inicio-wrap" style="display:${mostrarInicio ? 'block' : 'none'};">
                     <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:0.8rem;">
                         Datos de inicio del estado de cuenta: se generan las cuotas desde este mes/año hasta el mes actual.
