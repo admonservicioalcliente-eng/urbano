@@ -21,7 +21,7 @@ window.NassauEstados = {
                         <h3>Detalle Mensual</h3>
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
                             <button class="btn-primary" onclick="window.NassauEstados.generarCuentaCobro()">Generar Cuenta de Cobro</button>
-                            <button class="btn-secondary" onclick="window.NassauEstados.generarCuotaAdmon()">Generar Cuota de Admon</button>
+                            <button class="btn-blue" onclick="window.NassauEstados.generarCuotaAdmon()">Generar Cuota de Admon</button>
                         </div>
                     </div>
                     <table class="premium-table" id="estados-table">
