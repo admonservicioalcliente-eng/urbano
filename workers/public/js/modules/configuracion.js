@@ -91,17 +91,33 @@ const params = await window.NassauAPI.apiGet('/parametros');
                 <tr>
 <td><strong>${p.anio}</strong></td>
                      <td>
-                         <div style="display:flex; flex-direction:column; gap:4px;">
-                             <div class="config-dias-control">
-                                 <span style="margin-right:4px;">$</span>
-                                 <input type="number" step="1000" min="0" class="config-field config-cuota" style="width:110px;" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                         <div class="config-valores">
+                             <div class="config-valor-grupo">
+                                 <span class="config-valor-titulo">Valor Cuota Presupuesto</span>
+                                 <div class="config-dias-control">
+                                     <span class="config-valor-simbolo">$</span>
+                                     <input type="number" step="1000" min="0" class="config-field config-cuota" style="width:110px;" id="cuota-${p.id}" value="${p.cuota_admon || 0}">
+                                 </div>
                              </div>
-                             <div class="config-dias-control">
-                                 <span style="margin-right:4px;">+</span>
-                                 <input type="number" step="1000" min="0" class="config-field config-cuota-extra" style="width:110px;" id="cuotaextra-${p.id}" value="${p.cuota_extra || 0}" placeholder="$0">
-                                 <input type="number" min="1" max="12" class="config-field config-gen-extra" style="width:60px;" id="cemes-${p.id}" value="${p.cuota_extra_mes_inicio || ''}" placeholder="mes">
-                                 <input type="number" min="2020" class="config-field config-gen-extra" style="width:70px;" id="ceanio-${p.id}" value="${p.cuota_extra_anio_inicio || ''}" placeholder="año">
-                                 <input type="number" min="1" max="60" class="config-field config-gen-extra" style="width:50px;" id="cedur-${p.id}" value="${p.cuota_extra_duracion || ''}" placeholder="meses">
+                             <div class="config-valor-grupo">
+                                 <span class="config-valor-titulo">Cuota Extra</span>
+                                 <div class="config-dias-control">
+                                     <span class="config-valor-simbolo">+</span>
+                                     <input type="number" step="1000" min="0" class="config-field config-cuota-extra" style="width:110px;" id="cuotaextra-${p.id}" value="${p.cuota_extra || 0}" placeholder="$0">
+                                 </div>
+                                 <div class="config-extra-fila">
+                                     <label class="config-extra-campo">Mes
+                                         <input type="number" min="1" max="12" class="config-field config-gen-extra" id="cemes-${p.id}" value="${p.cuota_extra_mes_inicio || ''}" placeholder="mes">
+                                     </label>
+                                     <label class="config-extra-campo">Duración
+                                         <input type="number" min="1" max="60" class="config-field config-gen-extra" id="cedur-${p.id}" value="${p.cuota_extra_duracion || ''}" placeholder="meses">
+                                     </label>
+                                 </div>
+                                 <div class="config-extra-fila">
+                                     <label class="config-extra-campo">Año inicio
+                                         <input type="number" min="2020" class="config-field config-gen-extra" id="ceanio-${p.id}" value="${p.cuota_extra_anio_inicio || ''}" placeholder="año">
+                                     </label>
+                                 </div>
                              </div>
                              <button class="btn-primary btn-sm" onclick="window.NassauConfiguracion.modificarCuota('${p.id}')">Modificar</button>
                          </div>
