@@ -115,7 +115,7 @@ export async function handleCreate(request, env, user) {
         cuota_admon, cuota_total, estado, numero_cuenta, modo_pago, telefono, email, notas,
         prefijo, mes_inicio, anio_inicio, abono_inicial,
         coef_apto, coef_celda, coef_cuarto_util, coef_local, valor_celda, valor_cuarto_util, valor_local, has_celda, has_cuarto_util, has_local
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27) RETURNING *`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28) RETURNING *`,
       [
         urbId, nombre_propietario, apartamento, no_celda || null, no_cuarto_util || null, no_local || null,
         cuotaManual, cuotaTotal, estado || 'activo', numero_cuenta || null, modo_pago || 'efectivo',
