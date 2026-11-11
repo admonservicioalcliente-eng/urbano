@@ -7,6 +7,24 @@ window.NassauConfiguracion = {
          document.querySelectorAll('.help-tip.open').forEach(t => t.classList.remove('open'));
          if (!wasOpen) tip.classList.add('open');
      },
+     // Muestra/oculta los campos de cuota extra. Al ocultarlos se deshabilitan
+     // para que no bloqueen la validación del formulario (un input oculto con
+     // min=1 y value=0 impide el submit y el navegador no puede enfocarlo,
+     // por eso "no pasaba nada" al guardar).
+     toggleCuotaExtra(show) {
+         const wrap = document.getElementById('conf-cuota-extra-fields');
+         if (wrap) wrap.style.display = show ? '' : 'none';
+         const mes = document.getElementById('conf-cemes');
+         const anio = document.getElementById('conf-ceanio');
+         const dur = document.getElementById('conf-cedur');
+         [mes, anio, dur].forEach(el => { if (el) el.disabled = !show; });
+         if (show) {
+             // Al habilitarlos, garantizar valores válidos.
+             if (mes && (!mes.value || Number(mes.value) < 1 || Number(mes.value) > 12)) mes.value = 1;
+             if (anio && (!anio.value || Number(anio.value) < 2020)) anio.value = new Date().getFullYear();
+             if (dur && (!dur.value || Number(dur.value) < 1 || Number(dur.value) > 60)) dur.value = 1;
+         }
+     },
      async renderPage() {
         const html = `
             <div class="header-actions">
@@ -166,12 +184,12 @@ const html = `
                  </div>
                   <div class="form-row">
 <div class="form-group"><label>Valor Cuota Presupuesto ($)</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 40: Cuota de administración mensual calculada con base en el presupuesto anual de gastos comunes.</span><input type="number" step="0.01" id="conf-cuota" required value="234000" placeholder="Ej: 234000"></div>
-                        <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 41: Cuota aprobada por asamblea para gastos extraordinarios.</span><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="document.getElementById('conf-cuota-extra-fields').style.display=this.value>0?'':'none'"></div>
+                        <div class="form-group"><label>Cuota Extra ($) [0 si no aplica]</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 41: Cuota aprobada por asamblea para gastos extraordinarios.</span><input type="number" step="0.01" id="conf-cuotaextra" value="${cuotaExtraVal}" placeholder="Ej: 50000" oninput="window.NassauConfiguracion.toggleCuotaExtra(this.value>0)"></div>
                    </div>
                   <div class="form-row" id="conf-cuota-extra-fields" style="display:${cuotaExtraVal > 0 ? '' : 'none'};">
-                      <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="${cuotaExtraMes}"></div>
-                      <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${cuotaExtraAnio}"></div>
-                      <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="${cuotaExtraDur}"></div>
+                      <div class="form-group"><label>Mes Inicio</label><input type="number" id="conf-cemes" min="1" max="12" value="${cuotaExtraMes}" ${cuotaExtraVal > 0 ? '' : 'disabled'}></div>
+                      <div class="form-group"><label>Año Inicio</label><input type="number" id="conf-ceanio" min="2020" value="${cuotaExtraAnio}" ${cuotaExtraVal > 0 ? '' : 'disabled'}></div>
+                      <div class="form-group"><label>Duración (meses)</label><input type="number" id="conf-cedur" min="1" max="60" value="${cuotaExtraDur}" ${cuotaExtraVal > 0 ? '' : 'disabled'}></div>
                   </div>
                   <div class="form-row">
 <div class="form-group"><label>Tasa Mora (%)</label><span class="help-icon" onclick="window.NassauConfiguracion.toggleHelp(event)">?</span><span class="help-tip">Ley 675 Art. 42: Tasa de interés moratorio mensual sobre el valor de la cuota impaga.</span><input type="number" step="0.01" id="conf-tasa" required value="1.5" min="0" placeholder="Ej: 1.5"></div>
