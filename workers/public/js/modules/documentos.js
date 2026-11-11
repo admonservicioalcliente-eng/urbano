@@ -285,6 +285,10 @@ window.NassauDocumentos = {
         const M = 12;
         const RIGHT = W - M;
         const money = (n) => `$${Math.abs(Number(n) || 0).toLocaleString()}`;
+        const moneySigned = (n) => {
+            const v = Number(n) || 0;
+            return v < 0 ? `($${Math.abs(v).toLocaleString()})` : `$${v.toLocaleString()}`;
+        };
 
         // Marca de agua
         doc.setGState(new doc.GState({ opacity: 0.1 }));
@@ -338,12 +342,16 @@ window.NassauDocumentos = {
         y0 += 2.5;
 
         const boxGap = 3;
-        const boxW = (RIGHT - M - boxGap * 2) / 3;
+        const boxW = (RIGHT - M - boxGap * 3) / 4;
         const boxH = 13;
+        const estadoCuenta = (detalle?.estado_cuenta !== undefined && detalle?.estado_cuenta !== null)
+            ? Number(detalle.estado_cuenta)
+            : (Number(detalle?.total_a_pagar) || 0) - (Number(detalle?.saldo_a_favor) || 0);
         const movBoxes = [
             { label: `Cuota ${mesNames[mov.mes] || ''} ${mov.anio || ''}`.trim(), value: money(mov.cuota) },
             { label: 'Pagos aplicados', value: Number(mov.pagos) > 0 ? `-${money(mov.pagos)}` : money(0) },
-            { label: 'Saldo del mes pasado', value: money(mov.saldo), highlight: true }
+            { label: 'Saldo del mes pasado', value: money(mov.saldo), highlight: true },
+            { label: 'Estado de cuenta', value: moneySigned(estadoCuenta), highlight: true }
         ];
         movBoxes.forEach((bx, i) => {
             const x = M + i * (boxW + boxGap);

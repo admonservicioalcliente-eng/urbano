@@ -536,6 +536,9 @@ export async function handleCreateCuotaAdmon(request, env, user) {
   mesEnCurso.credito_aplicado = creditoAplicado;
   const saldoAFavor = Math.round((creditoDisponible - creditoAplicado) * 100) / 100;
   const totalAPagar = Math.round((carteraPendiente + mesEnCurso.pendiente) * 100) / 100;
+  // Saldo total de la cuenta: cartera + mes en curso − saldo a favor.
+  // Negativo = a favor del propietario (se imprime entre paréntesis).
+  const estadoCuenta = Math.round((totalAPagar - saldoAFavor) * 100) / 100;
 
   // Datos de la urbanización
   const urbRows = await query(env,
@@ -610,6 +613,7 @@ export async function handleCreateCuotaAdmon(request, env, user) {
     mes_en_curso: mesEnCurso,
     cartera_pendiente: carteraPendiente,
     total_a_pagar: totalAPagar,
+    estado_cuenta: estadoCuenta,
     saldo_a_favor: saldoAFavor,
     nota: 'PAGAR CUMPLIDAMENTE NOS HACE TENER UNA MEJOR CALIDAD DE VIDA'
   };
