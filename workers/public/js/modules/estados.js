@@ -19,7 +19,10 @@ window.NassauEstados = {
                 <div class="card table-container" style="margin-top: 20px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                         <h3>Detalle Mensual</h3>
-                        <button class="btn-primary" onclick="window.NassauEstados.generarCuentaCobro()">Generar Cuenta de Cobro</button>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn-primary" onclick="window.NassauEstados.generarCuentaCobro()">Generar Cuenta de Cobro</button>
+                            <button class="btn-secondary" onclick="window.NassauEstados.generarCuotaAdmon()">Generar Cuota de Admon</button>
+                        </div>
                     </div>
                     <table class="premium-table" id="estados-table">
                         <thead><tr><th>Mes</th><th>Apto</th><th>Celda</th><th>Cuarto Útil</th><th>Local</th><th>Cuota Total</th><th>Saldo Anterior</th><th>Días Mora</th><th>Intereses</th><th>Pagado</th><th>Total Deuda</th><th>Estado</th></tr></thead>
@@ -125,6 +128,21 @@ window.NassauEstados = {
                 <div class="stat-card"><div class="stat-icon" style="color:var(--success)">+</div><div class="stat-value">$${saldoFavor.toLocaleString()}</div><div class="stat-label">Total Pagado Aplicado</div></div>
                 <div class="stat-card"><div class="stat-icon">#</div><div class="stat-value">${mesesPendientes}</div><div class="stat-label">Meses Pendientes</div></div>`;
         } catch(e) { window.NassauApp.showToast('Error cargando estado de cuenta: ' + e.message, 'error'); } 
+        finally { window.NassauApp.showLoading(false); }
+    },
+    async generarCuotaAdmon() {
+        const propId = document.getElementById('estado-prop-selector').value;
+        if(!propId) return;
+        try {
+            window.NassauApp.showLoading(true);
+            const doc = await window.NassauAPI.apiPost('/cuentas-cobro/cuota-admon', { propietario_id: propId });
+            window.NassauApp.showToast('Cuota de administración generada!', 'success');
+            if(window.NassauDocumentos) {
+                const blob = await window.NassauDocumentos.generatePDF(doc);
+                if (blob) window.open(URL.createObjectURL(blob), '_blank');
+            }
+            await this.loadData();
+        } catch(e) { window.NassauApp.showToast('Error: ' + e.message, 'error'); }
         finally { window.NassauApp.showLoading(false); }
     },
     async generarCuentaCobro() {

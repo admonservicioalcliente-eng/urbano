@@ -144,9 +144,10 @@ window.NassauDocumentos = {
                     ? Number(d.valor_a_pagar_a_favor || 0)
                     : (Number(d.total_documento || d.total_deuda || 0) || 0);
                const badgeAFavor = d.es_a_favor ? ' <span style="background:#e8f5e9;color:#2e7d32;border-radius:4px;padding:1px 6px;font-size:0.7rem;font-weight:bold;">A FAVOR</span>' : '';
+               const badgeTipo = this.esCuotaAdmon(d) ? ' <span style="background:#e3f2fd;color:#1565c0;border-radius:4px;padding:1px 6px;font-size:0.7rem;font-weight:bold;">CUOTA</span>' : '';
                 html += `
                     <tr>
-                        <td><strong>${d.codigo || d.codigo_doc}</strong></td>
+                        <td><strong>${d.codigo || d.codigo_doc}</strong>${badgeTipo}</td>
                         <td>${fechaStr}</td>
                         <td><strong>$${totalMostrar.toLocaleString()}</strong>${badgeAFavor}</td>
                        <td><button class="btn-primary btn-sm" onclick='window.NassauDocumentos.reprintPDF(${JSON.stringify(d).replace(/'/g, "&#39;")})'>📄 PDF</button></td>
@@ -161,6 +162,11 @@ window.NassauDocumentos = {
          container.innerHTML = html;
      },
     reprintPDF(d) { this.generatePDF(d); },
+    esCuotaAdmon(d) {
+        let dj = d?.detalle_json;
+        if (typeof dj === 'string' && dj) { try { dj = JSON.parse(dj); } catch { dj = null; } }
+        return dj?.tipo_documento === 'cuota_admon';
+    },
     verEstadoCuenta(prop) {
         window.NassauApp.showPage('estados').then(() => {
             window.NassauEstados.renderPage(prop.id, new Date().getFullYear());
@@ -262,6 +268,189 @@ window.NassauDocumentos = {
             return null;
         }
     },
+    // PDF de "Cuota de Administración": movimiento del mes pasado, cuotas
+    // vencidas, concepto del mes en curso, total a pagar y cartera pendiente.
+    async generateCuotaAdmonPDF(data, detalle) {
+        if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'letter');
+
+        const prop = detalle?.propietario || {};
+        const urb = detalle?.urbanizacion || {};
+        const mesNames = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        const logo = await this.loadLogo();
+
+        const W = doc.internal.pageSize.getWidth();
+        const H = doc.internal.pageSize.getHeight();
+        const M = 12;
+        const RIGHT = W - M;
+        const money = (n) => `$${Math.abs(Number(n) || 0).toLocaleString()}`;
+
+        // Marca de agua
+        doc.setGState(new doc.GState({ opacity: 0.1 }));
+        doc.setTextColor(0, 150, 150);
+        doc.setFontSize(70); doc.setFont('helvetica', 'bold');
+        doc.text('NASSAU', W / 2, 180, { align: 'center', angle: 45 });
+        doc.setFontSize(40);
+        doc.text('P.H.', W / 2, 215, { align: 'center', angle: 45 });
+        doc.setGState(new doc.GState({ opacity: 1 }));
+        doc.setTextColor(0, 0, 0);
+
+        const b = 12;
+        if (logo) {
+            try { doc.addImage(logo, 'JPEG', M, b, 18, 18); } catch(e) { console.warn('Logo no válido', e); }
+        }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        doc.text(urb.nombre || 'EDIFICIO NASSAU P.H.', M + 22, b + 6);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        if (urb.direccion) doc.text(urb.direccion, M + 22, b + 10);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+        doc.text('CUOTA DE ADMINISTRACIÓN', M + 22, b + 14);
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(200, 0, 0);
+        doc.text(`No: ${data.codigo || data.codigo_doc || 'NAS-000'}`, RIGHT, b + 6, { align: 'right' });
+        doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        const fechaGen = data.fecha_emision || data.fecha_generacion || Date.now();
+        doc.text(`Fecha de generación: ${new Date(fechaGen).toLocaleDateString()}`, RIGHT, b + 10, { align: 'right' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 150, 150);
+        doc.text('ORIGINAL', RIGHT, b + 14, { align: 'right' });
+        doc.setTextColor(0, 0, 0); doc.setFont('helvetica', 'normal');
+
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.4); doc.line(M, b + 20, RIGHT, b + 20);
+
+        // Destinatario
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+        doc.text('Señor(a):', M, b + 26);
+        doc.setFont('helvetica', 'normal');
+        doc.text(data.propietario_nombre || prop.nombre || '', M + 24, b + 26);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Apartamento:', M, b + 31);
+        doc.setFont('helvetica', 'normal');
+        doc.text(data.propietario_apto || prop.apartamento || '', M + 24, b + 31);
+        doc.line(M, b + 35, RIGHT, b + 35);
+
+        // Desglose de la cuota
+        let y0 = b + 37;
+        const desglose = detalle?.desglose_cuota || prop.desglose || null;
+        if (desglose && (desglose.valor_apto || desglose.valor_celda || desglose.valor_cuarto_util || desglose.valor_local)) {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+            let desTxt = `Desglose: Apto ${money(desglose.valor_apto)}`;
+            if (desglose.valor_celda) desTxt += ` | Celda ${money(desglose.valor_celda)}`;
+            if (desglose.valor_cuarto_util) desTxt += ` | Cuarto ${money(desglose.valor_cuarto_util)}`;
+            if (desglose.valor_local) desTxt += ` | Local ${money(desglose.valor_local)}`;
+            doc.setFillColor(255, 255, 200); doc.rect(M, y0, RIGHT - M, 5, 'F');
+            doc.text(desTxt, M + 1, y0 + 3.4);
+            y0 += 7;
+        }
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+        doc.text('CONCEPTO', M, y0);
+        doc.text('VALOR', RIGHT - 12, y0, { align: 'right' });
+        doc.line(M, y0 + 2, RIGHT, y0 + 2);
+        let y = y0 + 7;
+
+        const section = (title) => {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+            doc.setTextColor(0, 150, 150);
+            doc.text(title, M, y);
+            doc.setTextColor(0, 0, 0);
+            y += 5;
+        };
+        const row = (label, value, opts = {}) => {
+            doc.setFont('helvetica', opts.bold ? 'bold' : 'normal');
+            doc.setFontSize(opts.size || 7.8);
+            doc.text(label, M + (opts.indent || 0), y);
+            doc.text(value, RIGHT - 12, y, { align: 'right' });
+            y += opts.gap || 5;
+        };
+
+        // ── Movimiento del mes pasado ──────────────────────────────
+        const mov = detalle?.movimiento_mes_pasado || {};
+        section('MOVIMIENTO DEL MES PASADO');
+        row(`Cuota de administración - ${mesNames[mov.mes] || ''} ${mov.anio || ''}`, money(mov.cuota), { indent: 2 });
+        row('Pagos aplicados', Number(mov.pagos) > 0 ? `-${money(mov.pagos)}` : money(0), { indent: 2 });
+        row('Saldo del mes pasado', money(mov.saldo), { indent: 2, bold: true });
+
+        y += 2;
+
+        // ── Cuotas vencidas ────────────────────────────────────────
+        section('CUOTAS VENCIDAS');
+        const vencidas = detalle?.cuotas_vencidas || [];
+        if (vencidas.length) {
+            const maxDetalle = 18;
+            vencidas.slice(0, maxDetalle).forEach(p => {
+                row(`${mesNames[p.mes] || ''} ${p.anio || ''}`, money(p.monto), { indent: 2, gap: 4.6 });
+            });
+            if (vencidas.length > maxDetalle) {
+                const resto = vencidas.slice(maxDetalle).reduce((s, p) => s + (Number(p.monto) || 0), 0);
+                row(`y ${vencidas.length - maxDetalle} mes(es) más`, money(resto), { indent: 2, gap: 4.6 });
+            }
+            row('Total cuotas vencidas', money(detalle.total_cuotas_vencidas), { indent: 2, bold: true });
+        } else {
+            row('Sin cuotas vencidas', money(0), { indent: 2 });
+        }
+
+        y += 2;
+
+        // ── Concepto del mes en curso ──────────────────────────────
+        const cur = detalle?.mes_en_curso || {};
+        section('CONCEPTO DEL MES EN CURSO');
+        row(`Cuota de administración - ${mesNames[cur.mes] || ''} ${cur.anio || ''}`, money(cur.cuota), { indent: 2 });
+        if (Number(cur.intereses) > 0) {
+            row('Intereses causados', money(cur.intereses), { indent: 2 });
+        }
+
+        // ── Total a pagar ──────────────────────────────────────────
+        doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.5);
+        doc.line(M, y, RIGHT, y); y += 6;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.text('TOTAL A PAGAR:', M, y);
+        doc.text(money(detalle?.total_a_pagar), RIGHT - 12, y, { align: 'right' });
+        y += 7;
+
+        // ── Cartera pendiente (deuda anterior al mes en curso) ─────
+        const cartera = Number(detalle?.cartera_pendiente) || 0;
+        if (cartera > 0.009) {
+            doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.4);
+            doc.line(M, y, RIGHT, y); y += 6;
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(0, 150, 150);
+            doc.text('CARTERA PENDIENTE:', M, y);
+            doc.text(money(cartera), RIGHT - 12, y, { align: 'right' });
+            doc.setTextColor(0, 0, 0);
+            y += 6;
+        }
+
+        // ── Saldo a favor (si aplica) ──────────────────────────────
+        const aFavor = Number(detalle?.saldo_a_favor) || 0;
+        if (aFavor > 0.009) {
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+            doc.text('SALDO A FAVOR:', M, y);
+            doc.text(money(aFavor), RIGHT - 12, y, { align: 'right' });
+            y += 6;
+        }
+
+        // ── Pie: datos de consignación ─────────────────────────────
+        const yf = H - 30;
+        doc.setDrawColor(0, 150, 150); doc.setLineWidth(0.6); doc.line(M, yf, RIGHT, yf);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(0, 0, 0);
+        const tipoCuenta = urb.banco_tipo_cuenta || 'ahorros';
+        const numCuenta = urb.banco_numero_cuenta || '3002272559';
+        const nombreBanco = urb.banco_nombre || '';
+        const titular = urb.banco_titular || 'SONEIDA OSSA QUINTERO';
+        const textoBanco = nombreBanco ? `${nombreBanco} - ` : '';
+        doc.text(`${textoBanco}CONSIGNACIÓN: ${tipoCuenta.toUpperCase()} No. ${numCuenta}`, W / 2, yf + 5, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.text(titular.toUpperCase(), W / 2, yf + 9, { align: 'center' });
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+        const celular = urb.banco_celular || urb.telefono || '300 227 25 58';
+        const email = urb.email || 'admonednassau@gmail.com';
+        doc.text(`Cel: ${celular} | Email: ${email}`, W / 2, yf + 13, { align: 'center' });
+        doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
+        doc.text('DOCUMENTO PROVISIONAL', W / 2, yf + 17, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+
+        return doc.output('blob');
+    },
     async generatePDF(data) {
         if (!window.jspdf) { window.NassauApp.showToast('Librería PDF no cargada', 'error'); return; }
         const { jsPDF } = window.jspdf;
@@ -270,6 +459,10 @@ window.NassauDocumentos = {
         let detalleRaw = data.detalle_json;
         if (typeof detalleRaw === 'string' && detalleRaw) { try { detalleRaw = JSON.parse(detalleRaw); } catch(e) { detalleRaw = null; } }
         const detalle = detalleRaw && typeof detalleRaw === 'object' ? detalleRaw : null;
+        // Documento mensual de cuota de administración (layout propio)
+        if (detalle?.tipo_documento === 'cuota_admon') {
+            return this.generateCuotaAdmonPDF(data, detalle);
+        }
         const prop = detalle?.propietario || {};
         const urb = detalle?.urbanizacion || {};
         const t = detalle?.totales || {};
@@ -673,8 +866,9 @@ window.NassauDocumentos = {
                   a.download = `${data.codigo || data.codigo_doc || 'documento'}.pdf`;
                   a.click();
                   setTimeout(() => URL.revokeObjectURL(url), 5000);
-                  const asunto = encodeURIComponent('Cuenta de Cobro ' + (data.codigo || data.codigo_doc || ''));
-                  const cuerpo = encodeURIComponent('Adjunto cuenta de cobro correspondiente.');
+                  const nombreDoc = this.esCuotaAdmon(data) ? 'Cuota de Administración' : 'Cuenta de Cobro';
+                  const asunto = encodeURIComponent(nombreDoc + ' ' + (data.codigo || data.codigo_doc || ''));
+                  const cuerpo = encodeURIComponent('Adjunto ' + nombreDoc.toLowerCase() + ' correspondiente.');
                   window.open(`mailto:${data.propietario_email}?subject=${asunto}&body=${cuerpo}`, '_blank');
               }
           } catch(e) { console.error('Error enviando correo', e); window.NassauApp.showToast('Error generando PDF', 'error'); }
@@ -728,7 +922,8 @@ window.NassauDocumentos = {
                       container.prepend(linkDiv);
                   }
                   const phone = data.propietario_telefono.replace(/[^0-9]/g, '');
-                  const waText = encodeURI('Buen día, adjunto la cuenta de cobro ' + (data.codigo || data.codigo_doc || '') + '.\n\nSeleccionar la línea completa, copiar y pegar en el explorador para descargar el PDF.\n\n`' + fileUrl + '`');
+                  const nombreDocWa = this.esCuotaAdmon(data) ? 'la cuota de administración' : 'la cuenta de cobro';
+                  const waText = encodeURI('Buen día, adjunto ' + nombreDocWa + ' ' + (data.codigo || data.codigo_doc || '') + '.\n\nSeleccionar la línea completa, copiar y pegar en el explorador para descargar el PDF.\n\n`' + fileUrl + '`');
                   const waLink = `https://api.whatsapp.com/send?phone=${phone}&text=${waText}`;
                   waWin.location.href = waLink;
                   window.NassauApp.showToast('WhatsApp abierto con enlace del PDF', 'success');

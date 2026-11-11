@@ -387,6 +387,254 @@ const detalleJson = {
   return ok(created, 201);
 }
 
+// Genera una "Cuota de Administración": documento mensual simplificado con
+// movimiento del mes pasado, cuotas vencidas, concepto del mes en curso,
+// total a pagar y cartera pendiente (deuda anterior al mes en curso).
+export async function handleCreateCuotaAdmon(request, env, user) {
+  let body;
+  try { body = await request.json(); } catch { return err(400, 'JSON inválido'); }
+
+  const { propietario_id } = body;
+  if (!propietario_id) return err(400, 'ID del propietario requerido');
+
+  const propRows = await query(env, `SELECT * FROM propietarios WHERE id = $1`, [propietario_id]);
+  if (!propRows.length) return err(404, 'Propietario no encontrado');
+  const prop = propRows[0];
+  if (user.rol !== 'superadmin' && prop.urbanizacion_id !== user.urbanizacion_id) {
+    return err(403, 'Acceso denegado');
+  }
+
+  // Reconciliación e intereses (misma base que la cuenta de cobro)
+  await reconciliarPagos(env, propietario_id);
+  await query(env, `SELECT actualizar_intereses_propietario($1)`, [propietario_id]);
+
+  const hoy = new Date();
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+  let prevAnio = anioActual;
+  let prevMes = mesActual - 1;
+  if (prevMes === 0) { prevMes = 12; prevAnio--; }
+
+  // Desglose por coeficientes del año actual
+  let presupuesto = 0;
+  try {
+    const pr = await query(env,
+      `SELECT cuota_admon FROM parametros_anio WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
+      [prop.urbanizacion_id, anioActual]
+    );
+    presupuesto = pr.length ? parseFloat(pr[0].cuota_admon) : 0;
+  } catch {}
+  const coefA = parseFloat(prop.coef_apto) || 0;
+  const coefC = prop.has_celda ? parseFloat(prop.coef_celda) || 0 : 0;
+  const coefQ = prop.has_cuarto_util ? parseFloat(prop.coef_cuarto_util) || 0 : 0;
+  const coefL = prop.has_local ? parseFloat(prop.coef_local) || 0 : 0;
+  const vcFixed = prop.has_celda ? parseFloat(prop.valor_celda) || 0 : 0;
+  const vqFixed = prop.has_cuarto_util ? parseFloat(prop.valor_cuarto_util) || 0 : 0;
+  const vlFixed = prop.has_local ? parseFloat(prop.valor_local) || 0 : 0;
+  let vApto = 0, vCelda = 0, vCuarto = 0, vLocal = 0;
+  if (presupuesto > 0 && (coefA + coefC + coefQ + coefL) > 0) {
+    vApto = Math.round(presupuesto * coefA / 100 * 100) / 100;
+    vCelda = prop.has_celda ? Math.round((presupuesto * coefC / 100 + vcFixed) * 100) / 100 : 0;
+    vCuarto = prop.has_cuarto_util ? Math.round((presupuesto * coefQ / 100 + vqFixed) * 100) / 100 : 0;
+    vLocal = prop.has_local ? Math.round((presupuesto * coefL / 100 + vlFixed) * 100) / 100 : 0;
+  }
+
+  let ecs = await query(env,
+    `SELECT * FROM estados_cuenta
+     WHERE propietario_id = $1
+     ORDER BY anio ASC, mes ASC`,
+    [propietario_id]
+  );
+
+  // Mes en curso virtual si el cron aún no lo generó
+  const tieneMesActual = ecs.some(e => parseInt(e.anio) === anioActual && parseInt(e.mes) === mesActual);
+  if (!tieneMesActual && prop.estado !== 'inactivo') {
+    const sumDesglose = vApto + vCelda + vCuarto + vLocal;
+    const cuotaVirtual = sumDesglose > 0
+      ? sumDesglose
+      : (parseFloat(prop.cuota_total) || parseFloat(prop.cuota_admon) || 0);
+    ecs.push({
+      anio: anioActual,
+      mes: mesActual,
+      pago_actual: cuotaVirtual,
+      saldo_anterior: 0,
+      saldo_favor: 0,
+      intereses: 0,
+      cerrado: false,
+      dias_mora: 0,
+      valor_apto: vApto,
+      valor_celda: vCelda,
+      valor_cuarto_util: vCuarto,
+      valor_local: vLocal,
+      virtual: true
+    });
+  }
+
+  // Pendiente por periodo: cuota + intereses − pagos aplicados al mes.
+  // Se ignora saldo_anterior para no duplicar la deuda de meses previos.
+  const periodos = ecs.map(e => {
+    const cuota = parseFloat(e.pago_actual) || 0;
+    const intereses = parseFloat(e.intereses) || 0;
+    const aplicado = parseFloat(e.saldo_favor) || 0;
+    const pendiente = Math.max(0, Math.round((cuota + intereses - aplicado) * 100) / 100);
+    return {
+      anio: parseInt(e.anio),
+      mes: parseInt(e.mes),
+      cuota,
+      intereses,
+      aplicado,
+      pendiente
+    };
+  });
+
+  const esIgual = (p, anio, mes) => p.anio === anio && p.mes === mes;
+  const esAntes = (p, anio, mes) => p.anio < anio || (p.anio === anio && p.mes < mes);
+
+  // Movimiento del mes inmediatamente anterior
+  const periodoMesPasado = periodos.find(p => esIgual(p, prevAnio, prevMes)) || null;
+  const movimientoMesPasado = {
+    anio: prevAnio,
+    mes: prevMes,
+    cuota: periodoMesPasado ? periodoMesPasado.cuota : 0,
+    pagos: periodoMesPasado
+      ? Math.min(periodoMesPasado.aplicado, periodoMesPasado.cuota + periodoMesPasado.intereses)
+      : 0,
+    saldo: periodoMesPasado ? periodoMesPasado.pendiente : 0
+  };
+
+  // Cuotas vencidas: meses anteriores al mes pasado que siguen impagos
+  const cuotasVencidas = periodos
+    .filter(p => esAntes(p, prevAnio, prevMes) && p.pendiente > 0.009)
+    .map(p => ({ anio: p.anio, mes: p.mes, monto: p.pendiente }));
+  const totalCuotasVencidas = Math.round(
+    cuotasVencidas.reduce((s, p) => s + p.monto, 0) * 100
+  ) / 100;
+
+  // Concepto del mes en curso
+  const periodoMesActual = periodos.find(p => esIgual(p, anioActual, mesActual)) || null;
+  const mesEnCurso = {
+    anio: anioActual,
+    mes: mesActual,
+    cuota: periodoMesActual ? periodoMesActual.cuota : 0,
+    intereses: periodoMesActual ? periodoMesActual.intereses : 0,
+    pendiente: periodoMesActual ? periodoMesActual.pendiente : 0
+  };
+
+  // Cartera pendiente = deuda anterior al mes en curso
+  const carteraPendiente = Math.round((movimientoMesPasado.saldo + totalCuotasVencidas) * 100) / 100;
+  const totalAPagar = Math.round((carteraPendiente + mesEnCurso.pendiente) * 100) / 100;
+
+  // Saldo a favor si los pagos superan todos los cargos
+  const totalCargos = Math.round(
+    periodos.reduce((s, p) => s + p.cuota + p.intereses, 0) * 100
+  ) / 100;
+  const pagosRows = await query(env,
+    `SELECT COALESCE(SUM(monto), 0) AS total FROM pagos WHERE propietario_id = $1`,
+    [propietario_id]
+  );
+  const totalPagos = parseFloat(pagosRows[0].total) || 0;
+  const saldoAFavor = Math.max(0, Math.round((totalPagos - totalCargos) * 100) / 100);
+
+  // Datos de la urbanización
+  const urbRows = await query(env,
+    `SELECT nombre, direccion, telefono, email, prefijo_doc, nit,
+            banco_numero_cuenta, banco_tipo_cuenta, banco_nombre, banco_titular, banco_celular
+     FROM urbanizaciones WHERE id = $1`,
+    [user.urbanizacion_id]
+  );
+  const urb = urbRows[0] || { nombre: 'EDIFICIO NASSAU P.H.', prefijo_doc: 'NAS' };
+  const prefijo = urb.prefijo_doc || 'NAS';
+
+  const paramRows = await query(env,
+    `SELECT mostrar_copia FROM parametros_anio
+     WHERE urbanizacion_id = $1 AND anio = $2 LIMIT 1`,
+    [user.urbanizacion_id, anioActual]
+  );
+  const mostrarCopia = paramRows[0]?.mostrar_copia !== false;
+
+  // Consecutivo compartido con las cuentas de cobro
+  const consecRows = await query(env,
+    `SELECT COALESCE(MAX(consecutivo), 0) + 1 AS proximo
+     FROM cuentas_cobro WHERE urbanizacion_id = $1`,
+    [user.urbanizacion_id]
+  );
+  const proximo = parseInt(consecRows[0].proximo);
+  const codigoDoc = `${prefijo}${String(proximo).padStart(3, '0')}`;
+
+  const propContacto = {
+    nombre: prop.nombre_propietario,
+    apartamento: prop.apartamento,
+    cuota_admon: prop.cuota_admon,
+    email: prop.email || '',
+    telefono: prop.telefono || '',
+    coef_apto: prop.coef_apto,
+    coef_celda: prop.coef_celda,
+    coef_cuarto_util: prop.coef_cuarto_util,
+    coef_local: prop.coef_local,
+    valor_celda: prop.valor_celda,
+    valor_cuarto_util: prop.valor_cuarto_util,
+    valor_local: prop.valor_local,
+    has_celda: prop.has_celda,
+    has_cuarto_util: prop.has_cuarto_util,
+    has_local: prop.has_local,
+    desglose: {
+      valor_apto: vApto,
+      valor_celda: vCelda,
+      valor_cuarto_util: vCuarto,
+      valor_local: vLocal,
+      presupuesto
+    }
+  };
+
+  const detalleJson = {
+    tipo_documento: 'cuota_admon',
+    mostrar_copia: mostrarCopia,
+    urbanizacion: {
+      nombre: urb.nombre,
+      direccion: urb.direccion,
+      telefono: urb.telefono,
+      email: urb.email,
+      banco_numero_cuenta: urb.banco_numero_cuenta,
+      banco_tipo_cuenta: urb.banco_tipo_cuenta,
+      banco_nombre: urb.banco_nombre,
+      banco_titular: urb.banco_titular,
+      banco_celular: urb.banco_celular
+    },
+    propietario: propContacto,
+    desglose_cuota: propContacto.desglose,
+    movimiento_mes_pasado: movimientoMesPasado,
+    cuotas_vencidas: cuotasVencidas,
+    total_cuotas_vencidas: totalCuotasVencidas,
+    mes_en_curso: mesEnCurso,
+    cartera_pendiente: carteraPendiente,
+    total_a_pagar: totalAPagar,
+    saldo_a_favor: saldoAFavor,
+    nota: 'PAGAR CUMPLIDAMENTE NOS HACE TENER UNA MEJOR CALIDAD DE VIDA'
+  };
+
+  const insertRows = await query(env,
+    `INSERT INTO cuentas_cobro (
+      urbanizacion_id, propietario_id, consecutivo, codigo_doc, total_deuda, detalle_json, generado_por
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [user.urbanizacion_id, propietario_id, proximo, codigoDoc, totalAPagar, detalleJson, user.id]
+  );
+
+  const created = insertRows[0];
+  created.detalle_json = detalleJson;
+  created.codigo = codigoDoc;
+  created.fecha_emision = hoy.toISOString();
+  created.propietario_nombre = prop.nombre_propietario;
+  created.propietario_apto = prop.apartamento;
+  created.propietario_email = prop.email || '';
+  created.propietario_telefono = prop.telefono || '';
+  created.total_documento = totalAPagar;
+  created.tipo_documento = 'cuota_admon';
+  created.es_a_favor = saldoAFavor > 0;
+  created.valor_a_pagar_a_favor = saldoAFavor;
+
+  return ok(created, 201);
+}
+
 export async function handleDeleteAll(request, env, user) {
   const result = await query(env,
     `DELETE FROM cuentas_cobro WHERE urbanizacion_id = $1`,

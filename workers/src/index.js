@@ -308,7 +308,8 @@ if (res instanceof Response) return res;
       } else if (path === '/api/dashboard' && method === 'GET') {
         res = await estadosHandler.handleGetDashboard(request, env, user);
       } else if (path.startsWith('/api/cuentas-cobro')) {
-         if (method === 'GET') res = await cuentasCobroHandler.handleGetAll(request, env, user);
+         if (path === '/api/cuentas-cobro/cuota-admon' && method === 'POST') res = await cuentasCobroHandler.handleCreateCuotaAdmon(request, env, user);
+         else if (method === 'GET') res = await cuentasCobroHandler.handleGetAll(request, env, user);
          else if (method === 'POST') res = await cuentasCobroHandler.handleCreate(request, env, user);
          else if (method === 'DELETE') res = await cuentasCobroHandler.handleDeleteAll(request, env, user);
        } else if (path === '/api/temp-pdf' && method === 'POST') {
