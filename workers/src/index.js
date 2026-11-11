@@ -162,12 +162,11 @@ export default {
         return jsonResponse({ generated: total }, 200, env);
       }
 
-      if (path === '/api/debug/pagos' && method === 'GET') {
-        const { query } = await import('./db.js');
-        const propId = url.searchParams.get('propietario_id');
-        if (!propId) return jsonResponse({ error: 'propietario_id requerido' }, 400, env);
-        const pagos = await query(env, `SELECT id, monto, fecha_pago, tipo_pago, comprobante, descripcion, estado_cuenta_id FROM pagos WHERE propietario_id = $1 ORDER BY fecha_pago ASC`, [propId]);
-        return jsonResponse({ pagos }, 200, env);
+      // Diagnóstico: requiere autenticación y rol superadmin.
+      if ((path === '/api/debug/pagos' || path === '/api/debug/prop') && method === 'GET') {
+        const authDbg = await authMiddleware(request, env);
+        if (authDbg.error) return errorResponse(authDbg.error, authDbg.status, env);
+        if (authDbg.user.rol !== 'superadmin') return errorResponse('Solo superadmin', 403, env);
       }
 
       if (path === '/api/debug/pagos' && method === 'GET') {
