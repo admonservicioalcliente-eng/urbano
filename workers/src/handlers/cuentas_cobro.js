@@ -523,6 +523,14 @@ export async function handleCreateCuotaAdmon(request, env, user) {
   // Cartera pendiente = deuda anterior al mes en curso
   const carteraPendiente = Math.round((movimientoMesPasado.saldo + totalCuotasVencidas) * 100) / 100;
 
+  // Pagos reales registrados (Σ), incluyendo sobrepagos. Se usan para el
+  // estado de cuenta al cierre del mes anterior.
+  const pagosTotalRows = await query(env,
+    `SELECT COALESCE(SUM(monto), 0) AS total FROM pagos WHERE propietario_id = $1`,
+    [propietario_id]
+  );
+  const totalPagos = Math.round((parseFloat(pagosTotalRows[0]?.total) || 0) * 100) / 100;
+
   // Crédito real ya asignado a los periodos (pagos que excedieron su cuota).
   // Puede estar guardado en el último mes abierto cuando el mes en curso aún
   // no existe (periodo virtual), por eso se toma de saldo_favor y no del
@@ -536,10 +544,16 @@ export async function handleCreateCuotaAdmon(request, env, user) {
   mesEnCurso.credito_aplicado = creditoAplicado;
   const saldoAFavor = Math.round((creditoDisponible - creditoAplicado) * 100) / 100;
   const totalAPagar = Math.round((carteraPendiente + mesEnCurso.pendiente) * 100) / 100;
-  // Estado de cuenta al cierre del mes anterior: cartera pendiente (deuda
-  // anterior) menos el crédito disponible. NO incluye el mes en curso.
-  // Negativo = a favor del propietario (se imprime entre paréntesis).
-  const estadoCuenta = Math.round((carteraPendiente - creditoDisponible) * 100) / 100;
+  // Estado de cuenta al cierre del mes anterior: cargos previos (cuota +
+  // intereses) − todos los pagos. Al incluir los sobrepagos, un resultado
+  // negativo significa saldo A FAVOR del propietario. No incluye los cargos
+  // del mes en curso.
+  const cargosAnteriores = Math.round(
+    periodos
+      .filter(p => esAntes(p, anioActual, mesActual))
+      .reduce((s, p) => s + p.cuota + p.intereses, 0) * 100
+  ) / 100;
+  const estadoCuenta = Math.round((cargosAnteriores - totalPagos) * 100) / 100;
 
   // Datos de la urbanización
   const urbRows = await query(env,

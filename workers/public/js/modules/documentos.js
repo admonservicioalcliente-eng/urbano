@@ -343,7 +343,7 @@ window.NassauDocumentos = {
 
         const boxGap = 3;
         const boxW = (RIGHT - M - boxGap * 3) / 4;
-        const boxH = 13;
+        const boxH = 15.5;
         // Estado de cuenta al cierre del mes anterior: cartera pendiente menos
         // el crédito disponible (saldo a favor no aplicado + aplicado al mes).
         // No incluye el mes en curso.
@@ -352,11 +352,12 @@ window.NassauDocumentos = {
             : (Number(detalle?.cartera_pendiente) || 0)
                 - (Number(detalle?.saldo_a_favor) || 0)
                 - (Number(detalle?.mes_en_curso?.credito_aplicado) || 0);
+        const esAFavorCuenta = estadoCuenta < -0.009;
         const movBoxes = [
             { label: `Cuota ${mesNames[mov.mes] || ''} ${mov.anio || ''}`.trim(), value: money(mov.cuota) },
             { label: 'Pagos aplicados', value: Number(mov.pagos) > 0 ? `-${money(mov.pagos)}` : money(0) },
             { label: 'Saldo del mes pasado', value: money(mov.saldo), highlight: true },
-            { label: 'Estado de cuenta', value: moneySigned(estadoCuenta), highlight: true }
+            { label: 'Estado de cuenta', value: moneySigned(estadoCuenta), highlight: true, favor: esAFavorCuenta }
         ];
         movBoxes.forEach((bx, i) => {
             const x = M + i * (boxW + boxGap);
@@ -369,7 +370,12 @@ window.NassauDocumentos = {
             doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(90, 90, 90);
             doc.text(bx.label, x + boxW / 2, y0 + 4, { align: 'center', maxWidth: boxW - 3 });
             doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(0, 0, 0);
-            doc.text(bx.value, x + boxW / 2, y0 + 10, { align: 'center' });
+            doc.text(bx.value, x + boxW / 2, y0 + 9.8, { align: 'center' });
+            if (bx.favor) {
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(0, 150, 150);
+                doc.text('(A FAVOR)', x + boxW / 2, y0 + 13.6, { align: 'center' });
+                doc.setTextColor(0, 0, 0);
+            }
         });
         doc.setTextColor(0, 0, 0);
         y0 += boxH + 4;
