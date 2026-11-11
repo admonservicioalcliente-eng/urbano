@@ -79,31 +79,38 @@ export default {
           return jsonResponse({ user, modo: 'superadmin_todas', resumen }, 200, env);
         }
 
+        const scopeAll = url.searchParams.get('scope') === 'all';
+        const filtroUrb = scopeAll ? '' : 'WHERE p.urbanizacion_id = $1';
+        const filtroUrbPeriodos = scopeAll ? 'WHERE ec.intereses <> 0' : 'WHERE p.urbanizacion_id = $1 AND ec.intereses <> 0';
+        const paramsUrb = scopeAll ? [] : [user.urbanizacion_id];
+
         const propietarios = await query(env, `
           SELECT p.id, p.apartamento, p.nombre_propietario, p.estado::text AS estado,
+                 p.urbanizacion_id, urb.nombre AS urbanizacion_nombre,
                  COUNT(ec.id) FILTER (WHERE ec.intereses <> 0)::int AS periodos_con_interes,
                  COALESCE(SUM(ec.intereses), 0) AS total_intereses,
                  COALESCE(SUM(ec.intereses) FILTER (WHERE ec.cerrado = false), 0) AS intereses_abiertos,
                  COALESCE(SUM(ec.intereses) FILTER (WHERE ec.cerrado = true), 0) AS intereses_cerrados
           FROM propietarios p
           LEFT JOIN estados_cuenta ec ON ec.propietario_id = p.id
-          WHERE p.urbanizacion_id = $1
-          GROUP BY p.id, p.apartamento, p.nombre_propietario, p.estado
-          ORDER BY p.apartamento`, [user.urbanizacion_id]);
+          LEFT JOIN urbanizaciones urb ON urb.id = p.urbanizacion_id
+          ${filtroUrb}
+          GROUP BY p.id, p.apartamento, p.nombre_propietario, p.estado, p.urbanizacion_id, urb.nombre
+          ORDER BY urb.nombre, p.apartamento`, paramsUrb);
 
         const periodos = await query(env, `
-          SELECT p.apartamento, ec.anio, ec.mes, ec.intereses, ec.cerrado
+          SELECT p.apartamento, p.urbanizacion_id, ec.anio, ec.mes, ec.intereses, ec.cerrado
           FROM estados_cuenta ec
           JOIN propietarios p ON p.id = ec.propietario_id
-          WHERE p.urbanizacion_id = $1 AND ec.intereses <> 0
-          ORDER BY p.apartamento, ec.anio, ec.mes`, [user.urbanizacion_id]);
+          ${filtroUrbPeriodos}
+          ORDER BY p.urbanizacion_id, p.apartamento, ec.anio, ec.mes`, paramsUrb);
 
         const porApto = {};
-        for (const r of periodos) (porApto[r.apartamento] ||= []).push(r);
-        const datos = propietarios.map(p => ({ ...p, periodos: porApto[p.apartamento] || [] }));
+        for (const r of periodos) (porApto[r.urbanizacion_id + '|' + r.apartamento] ||= []).push(r);
+        const datos = propietarios.map(p => ({ ...p, periodos: porApto[p.urbanizacion_id + '|' + p.apartamento] || [] }));
 
         return jsonResponse({
-          user, modo: 'urbanizacion', resumen,
+          user, modo: scopeAll ? 'todas' : 'urbanizacion', resumen,
           total_propietarios: datos.length,
           total_intereses: datos.reduce((s, p) => s + Number(p.total_intereses || 0), 0),
           propietarios: datos
