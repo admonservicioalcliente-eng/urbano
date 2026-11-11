@@ -50,6 +50,66 @@ export default {
       await ensureMigrations(env);
       await ensureSyncEstados(env);
 
+      // TEMPORAL (solo lectura): datos de intereses por propietario.
+      // Se elimina después de validar/ejecutar la puesta a cero.
+      if (path === '/api/debug/intereses' && method === 'GET') {
+        const KEY = 'e65a8411eba84994b689965dffa4a598';
+        const url = new URL(request.url);
+        if (url.searchParams.get('key') !== KEY) return errorResponse('No autorizado', 401, env);
+        const { query } = await import('./db.js');
+        const email = (url.searchParams.get('email') || 'admin@nassau.com').toLowerCase().trim();
+        const us = await query(env,
+          `SELECT u.id, u.email, u.rol, u.urbanizacion_id, urb.nombre AS urbanizacion_nombre
+           FROM usuarios u LEFT JOIN urbanizaciones urb ON urb.id = u.urbanizacion_id
+           WHERE u.email = $1 LIMIT 1`, [email]);
+        if (!us.length) return jsonResponse({ error: 'Usuario no encontrado', email }, 404, env);
+        const user = us[0];
+
+        const resumen = await query(env, `
+          SELECT p.urbanizacion_id, urb.nombre AS urbanizacion_nombre,
+                 COUNT(DISTINCT p.id)::int AS propietarios,
+                 COALESCE(SUM(ec.intereses), 0) AS total_intereses
+          FROM propietarios p
+          LEFT JOIN estados_cuenta ec ON ec.propietario_id = p.id
+          LEFT JOIN urbanizaciones urb ON urb.id = p.urbanizacion_id
+          GROUP BY p.urbanizacion_id, urb.nombre
+          ORDER BY urb.nombre`);
+
+        if (!user.urbanizacion_id) {
+          return jsonResponse({ user, modo: 'superadmin_todas', resumen }, 200, env);
+        }
+
+        const propietarios = await query(env, `
+          SELECT p.id, p.apartamento, p.nombre_propietario, p.estado::text AS estado,
+                 COUNT(ec.id) FILTER (WHERE ec.intereses <> 0)::int AS periodos_con_interes,
+                 COALESCE(SUM(ec.intereses), 0) AS total_intereses,
+                 COALESCE(SUM(ec.intereses) FILTER (WHERE ec.cerrado = false), 0) AS intereses_abiertos,
+                 COALESCE(SUM(ec.intereses) FILTER (WHERE ec.cerrado = true), 0) AS intereses_cerrados
+          FROM propietarios p
+          LEFT JOIN estados_cuenta ec ON ec.propietario_id = p.id
+          WHERE p.urbanizacion_id = $1
+          GROUP BY p.id, p.apartamento, p.nombre_propietario, p.estado
+          ORDER BY p.apartamento`, [user.urbanizacion_id]);
+
+        const periodos = await query(env, `
+          SELECT p.apartamento, ec.anio, ec.mes, ec.intereses, ec.cerrado
+          FROM estados_cuenta ec
+          JOIN propietarios p ON p.id = ec.propietario_id
+          WHERE p.urbanizacion_id = $1 AND ec.intereses <> 0
+          ORDER BY p.apartamento, ec.anio, ec.mes`, [user.urbanizacion_id]);
+
+        const porApto = {};
+        for (const r of periodos) (porApto[r.apartamento] ||= []).push(r);
+        const datos = propietarios.map(p => ({ ...p, periodos: porApto[p.apartamento] || [] }));
+
+        return jsonResponse({
+          user, modo: 'urbanizacion',
+          total_propietarios: datos.length,
+          total_intereses: datos.reduce((s, p) => s + Number(p.total_intereses || 0), 0),
+          propietarios: datos
+        }, 200, env);
+      }
+
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
