@@ -50,33 +50,6 @@ export default {
       await ensureMigrations(env);
       await ensureSyncEstados(env);
 
-      // TEMPORAL: valida (sin insertar) el INSERT de propietarios con EXPLAIN.
-      if (path === '/api/debug/test-insert-prop' && method === 'GET') {
-        const KEY = 'e65a8411eba84994b689965dffa4a598';
-        const url = new URL(request.url);
-        if (url.searchParams.get('key') !== KEY) return errorResponse('No autorizado', 401, env);
-        const { query } = await import('./db.js');
-        const email = (url.searchParams.get('email') || 'admin@nassau.com').toLowerCase().trim();
-        const us = await query(env, `SELECT urbanizacion_id FROM usuarios WHERE email = $1 LIMIT 1`, [email]);
-        if (!us.length || !us[0].urbanizacion_id) return errorResponse('Usuario/urbanización no encontrada', 404, env);
-        const urbId = us[0].urbanizacion_id;
-        let plan;
-        try {
-          plan = await query(env,
-            `EXPLAIN (COSTS OFF) INSERT INTO propietarios (
-              urbanizacion_id, nombre_propietario, apartamento, no_celda, no_cuarto_util, no_local,
-              cuota_admon, cuota_total, estado, numero_cuenta, modo_pago, telefono, email, notas,
-              prefijo, mes_inicio, anio_inicio, abono_inicial,
-              coef_apto, coef_celda, coef_cuarto_util, coef_local, valor_celda, valor_cuarto_util, valor_local, has_celda, has_cuarto_util, has_local
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)`,
-            [urbId, 'TEST', 'ZZ-TEST', null, null, null, 0, 0, 'inactivo', null, 'efectivo',
-             null, null, null, null, null, null, 0, 0, 0, 0, 0, 0, 0, 0, false, false, false]);
-        } catch (e) {
-          return jsonResponse({ ok: false, error: e.message }, 500, env);
-        }
-        return jsonResponse({ ok: true, plan }, 200, env);
-      }
-
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
