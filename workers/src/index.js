@@ -117,6 +117,61 @@ export default {
         }, 200, env);
       }
 
+      // TEMPORAL: ejecuta la puesta a cero de intereses de la urbanización del usuario.
+      if (path === '/api/debug/intereses-zero' && method === 'POST') {
+        const KEY = 'e65a8411eba84994b689965dffa4a598';
+        const url = new URL(request.url);
+        if (url.searchParams.get('key') !== KEY) return errorResponse('No autorizado', 401, env);
+        const { query } = await import('./db.js');
+        const email = (url.searchParams.get('email') || 'admin@nassau.com').toLowerCase().trim();
+        const us = await query(env,
+          `SELECT u.id, u.email, u.rol, u.urbanizacion_id, urb.nombre AS urbanizacion_nombre
+           FROM usuarios u LEFT JOIN urbanizaciones urb ON urb.id = u.urbanizacion_id
+           WHERE u.email = $1 LIMIT 1`, [email]);
+        if (!us.length) return jsonResponse({ error: 'Usuario no encontrado', email }, 404, env);
+        const user = us[0];
+        if (!user.urbanizacion_id) return errorResponse('El usuario no tiene urbanización asignada', 400, env);
+
+        // Respaldo de los estados con interés antes de modificarlos.
+        await query(env, `CREATE TABLE IF NOT EXISTS intereses_backup_20261111 AS
+                          SELECT * FROM estados_cuenta WHERE 1=0`);
+        const backup = await query(env, `
+          INSERT INTO intereses_backup_20261111
+          SELECT ec.* FROM estados_cuenta ec
+          JOIN propietarios p ON p.id = ec.propietario_id
+          WHERE p.urbanizacion_id = $1 AND ec.intereses <> 0
+            AND NOT EXISTS (SELECT 1 FROM intereses_backup_20261111 b WHERE b.id = ec.id)
+          RETURNING id`, [user.urbanizacion_id]);
+
+        const afectados = await query(env, `
+          UPDATE estados_cuenta ec
+          SET intereses = 0
+          FROM propietarios p
+          WHERE ec.propietario_id = p.id
+            AND p.urbanizacion_id = $1
+            AND ec.intereses <> 0
+          RETURNING ec.id, ec.propietario_id, ec.anio, ec.mes`, [user.urbanizacion_id]);
+
+        const verificacion = await query(env, `
+          SELECT p.apartamento, p.nombre_propietario, p.estado::text AS estado,
+                 COALESCE(SUM(ec.intereses), 0) AS total_intereses
+          FROM propietarios p
+          LEFT JOIN estados_cuenta ec ON ec.propietario_id = p.id
+          WHERE p.urbanizacion_id = $1
+          GROUP BY p.id, p.apartamento, p.nombre_propietario, p.estado
+          ORDER BY p.apartamento`, [user.urbanizacion_id]);
+
+        return jsonResponse({
+          ok: true, user,
+          respaldo_tabla: 'intereses_backup_20261111',
+          filas_respaldadas: backup.length,
+          filas_actualizadas: afectados.length,
+          detalle_actualizado: afectados,
+          verificacion,
+          total_intereses_restante: verificacion.reduce((s, r) => s + Number(r.total_intereses || 0), 0)
+        }, 200, env);
+      }
+
       if (path === '/api/admin/reproyectar' && method === 'POST') {
         const auth2 = await authMiddleware(request, env);
         if (auth2.error) return errorResponse(auth2.error, auth2.status, env);
