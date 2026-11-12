@@ -101,19 +101,15 @@ const params = await window.NassauAPI.apiGet('/parametros');
                              </div>
                              <div class="config-valor-grupo">
                                  <span class="config-valor-titulo">Cuota Extra</span>
-                                 <div class="config-dias-control">
+                                 <div class="config-extra-linea">
                                      <span class="config-valor-simbolo">+</span>
                                      <input type="number" step="1000" min="0" class="config-field config-cuota-extra" style="width:110px;" id="cuotaextra-${p.id}" value="${p.cuota_extra || 0}" placeholder="$0">
-                                 </div>
-                                 <div class="config-extra-fila">
                                      <label class="config-extra-campo">Mes
                                          <input type="number" min="1" max="12" class="config-field config-gen-extra" id="cemes-${p.id}" value="${p.cuota_extra_mes_inicio || ''}" placeholder="mes">
                                      </label>
                                      <label class="config-extra-campo">Duración
                                          <input type="number" min="1" max="60" class="config-field config-gen-extra" id="cedur-${p.id}" value="${p.cuota_extra_duracion || ''}" placeholder="meses">
                                      </label>
-                                 </div>
-                                 <div class="config-extra-fila">
                                      <label class="config-extra-campo">Año inicio
                                          <input type="number" min="2020" class="config-field config-gen-extra" id="ceanio-${p.id}" value="${p.cuota_extra_anio_inicio || ''}" placeholder="año">
                                      </label>

@@ -87,13 +87,13 @@ button { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-weight:
 .config-table { white-space: nowrap; }
 .config-table th, .config-table td { padding: 0.5rem 0.6rem; }
 .config-table .config-consec-control button { padding: 0.15rem 0.4rem; }
-.config-valores { display: flex; flex-direction: column; gap: 0.5rem; min-width: 210px; }
+.config-valores { display: flex; align-items: flex-end; gap: 1.25rem; flex-wrap: nowrap; }
 .config-valor-grupo { display: flex; flex-direction: column; gap: 0.25rem; }
-.config-valor-titulo { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary, #666); text-transform: uppercase; letter-spacing: 0.03em; }
+.config-valor-titulo { font-size: 0.68rem; font-weight: 600; color: var(--text-secondary, #666); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
 .config-valor-simbolo { margin-right: 0.25rem; color: var(--text-secondary, #666); }
-.config-extra-fila { display: flex; align-items: flex-end; gap: 0.6rem; flex-wrap: wrap; }
-.config-extra-campo { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.68rem; color: var(--text-secondary, #666); }
-.config-extra-campo input { width: 80px; }
+.config-extra-linea { display: flex; align-items: center; gap: 0.5rem; }
+.config-extra-campo { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; color: var(--text-secondary, #666); white-space: nowrap; }
+.config-extra-campo input { width: 60px; }
 @media (max-width: 768px) {
     #mobile-menu-btn { display: block; }
     .sidebar { transform: translateX(-100%); } .sidebar.active { transform: translateX(0); }
