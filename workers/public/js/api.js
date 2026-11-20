@@ -22,7 +22,19 @@ window.NassauAPI = {
         if (!response.ok) throw new Error(json.message || json.error || 'API Request Failed');
         return json.ok !== undefined ? json.data : json;
     },
+    // Llamadas públicas de la pantalla de login: nunca adjuntan el token.
+    // Si se enviara un token, /api/urbanizaciones cae al handler de superadmin
+    // y responde 403, por eso el listado de edificios no aparecía.
+    async requestPublic(path, options = {}) {
+        const headers = { ...(options.headers || {}) };
+        if (options.body && typeof options.body === 'string') headers['Content-Type'] = 'application/json';
+        const response = await fetch(`${window.API_BASE}${path}`, { ...options, headers });
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(json.message || json.error || 'API Request Failed');
+        return json.ok !== undefined ? json.data : json;
+    },
     apiGet(path) { return this.request(path, { method: 'GET' }); },
+    apiGetPublic(path) { return this.requestPublic(path, { method: 'GET' }); },
     apiPost(path, body, meta) { return this.request(path, { method: 'POST', body: JSON.stringify(body), ...meta }); },
     apiPut(path, body) { return this.request(path, { method: 'PUT', body: JSON.stringify(body) }); },
     apiDelete(path) { return this.request(path, { method: 'DELETE' }); }

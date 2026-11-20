@@ -15,25 +15,92 @@ window.NassauAuth = {
             this.renderLoginPage();
         }
     },
+    // Edificio de respaldo si la API pública no responde.
+    escapeHtml(txt) {
+        return String(txt ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    },
     async renderLoginPage() {
         localStorage.removeItem('nassau_token');
         localStorage.removeItem('nassau_urb_id');
         localStorage.removeItem('nassau_urb_nombre');
         document.getElementById('login-screen').style.display = 'flex';
         document.getElementById('app-shell').style.display = 'none';
-        const select = document.getElementById('login-urb');
-        const logoImg = document.getElementById('login-logo-img');
+
+        const input = document.getElementById('login-urb');
+        const datalist = document.getElementById('login-edificios');
+        const hidden = document.getElementById('login-urb-id');
+        if (!input) return;
+
+        this._urbesLogin = [];
+        input.value = '';
+        if (hidden) hidden.value = '';
+        const email = document.getElementById('login-email');
+        const password = document.getElementById('login-password');
+        if (email) email.value = '';
+        if (password) password.value = '';
+        input.placeholder = 'Cargando edificios...';
+        if (datalist) datalist.innerHTML = '';
+
+        let urbs = [];
         try {
-            const urbs = await window.NassauAPI.apiGet('/urbanizaciones');
-            if(select && Array.isArray(urbs) && urbs.length) {
-                select.innerHTML = urbs.map(u => `<option value="${u.id}">${u.nombre}</option>`).join('');
-                if (urbs.length === 1) select.value = urbs[0].id;
-                this.loadLoginLogo(urbs[0].id);
-                select.addEventListener('change', () => this.loadLoginLogo(select.value));
-            } else throw new Error('empty');
+            // Llamada pública SIN token: con token el endpoint responde 403.
+            const data = await window.NassauAPI.apiGetPublic('/urbanizaciones');
+            if (Array.isArray(data)) urbs = data;
         } catch (e) {
-            if(select) select.innerHTML = '<option value="a1b2c3d4-0001-0001-0001-000000000001">Edificio Nassau P.H.</option>';
+            window.NassauApp?.showToast('No se pudo cargar la lista de edificios', 'error');
         }
+        if (!urbs.length) {
+            urbs = [{ id: 'a1b2c3d4-0001-0001-0001-000000000001', nombre: 'Edificio Nassau P.H.' }];
+        }
+        this._urbesLogin = urbs;
+
+        if (datalist) {
+            datalist.innerHTML = urbs
+                .map(u => `<option value="${this.escapeHtml(u.nombre)}"></option>`)
+                .join('');
+        }
+        input.placeholder = 'Escriba el nombre del edificio';
+
+        if (!this._urbInputListener) {
+            input.addEventListener('input', () => this.onEdificioInput());
+            input.addEventListener('change', () => this.onEdificioInput());
+            this._urbInputListener = true;
+        }
+    },
+    // Resuelve el nombre escrito a un ID conocido y trae los datos guardados.
+    onEdificioInput() {
+        const input = document.getElementById('login-urb');
+        const hidden = document.getElementById('login-urb-id');
+        if (!input || !hidden) return null;
+        const texto = input.value.trim().toLowerCase();
+        const urb = (this._urbesLogin || []).find(u => String(u.nombre).trim().toLowerCase() === texto);
+        if (urb) {
+            hidden.value = urb.id;
+            this.loadLoginLogo(urb.id);
+            this.aplicarCredencialesGuardadas(urb.id);
+            return urb;
+        }
+        hidden.value = '';
+        return null;
+    },
+    // Solo se guarda el correo. La contraseña la gestiona el navegador
+    // mediante autocomplete="current-password" (nunca en texto plano).
+    aplicarCredencialesGuardadas(urbId) {
+        let guardado = null;
+        try { guardado = JSON.parse(localStorage.getItem(`nassau_login_${urbId}`) || 'null'); } catch (e) {}
+        if (!guardado?.email) return;
+        const email = document.getElementById('login-email');
+        if (!email || email.value) return;
+        email.value = guardado.email;
+        // Notificar el cambio para que el gestor de contraseñas asocie
+        // este usuario con la contraseña guardada para el sitio.
+        email.dispatchEvent(new Event('input', { bubbles: true }));
+        email.dispatchEvent(new Event('change', { bubbles: true }));
+        setTimeout(() => document.getElementById('login-password')?.focus(), 0);
+    },
+    guardarCredencialLogin(urbId, email) {
+        if (!urbId || !email) return;
+        try { localStorage.setItem(`nassau_login_${urbId}`, JSON.stringify({ email })); } catch (e) {}
     },
     async loadLoginLogo(urbId) {
         const logoImg = document.getElementById('login-logo-img');
@@ -54,6 +121,7 @@ window.NassauAuth = {
             const data = await window.NassauAPI.apiPost('/auth/login', { email, password, urb_id, cf_token }, { _email: email });
             localStorage.setItem('nassau_token', data.token);
             localStorage.setItem('nassau_urb_id', urb_id);
+            this.guardarCredencialLogin(urb_id, data.user?.email || email);
             if (data.user?.urbanizacion_nombre) localStorage.setItem('nassau_urb_nombre', data.user.urbanizacion_nombre);
             this.initAuth();
             window.NassauApp?.showToast('Login exitoso', 'success');
@@ -68,7 +136,8 @@ window.NassauAuth = {
         localStorage.removeItem('nassau_urb_id');
         localStorage.removeItem('nassau_urb_nombre');
         this.renderLoginPage();
-    },    isLoggedIn() {
+    },
+    isLoggedIn() {
         const token = localStorage.getItem('nassau_token');
         if (!token) return false;
         try {
@@ -132,7 +201,16 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
-        const urb_id = document.getElementById('login-urb').value;
+        const texto = document.getElementById('login-urb').value.trim();
+        let urb_id = document.getElementById('login-urb-id').value;
+        if (!urb_id && texto) {
+            const urb = (window.NassauAuth._urbesLogin || []).find(u => String(u.nombre).trim().toLowerCase() === texto.toLowerCase());
+            if (urb) urb_id = urb.id;
+        }
+        if (!urb_id) {
+            window.NassauApp?.showToast('Escriba y seleccione un edificio válido de la lista', 'error');
+            return;
+        }
         const cf_token = document.querySelector('[name="cf-turnstile-response"]')?.value || 'dummy_token';
         window.NassauAuth.login(email, password, urb_id, cf_token);
     });

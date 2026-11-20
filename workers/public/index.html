@@ -35,21 +35,25 @@
         <div class="login-card">
             <img id="login-logo-img" src="/assets/logo.jpg" alt="Logo" class="login-logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCI+PGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiMzMzMiLz48L3N2Zz4='">
             <h2>Nassau TIC</h2>
-            <form id="login-form">
+            <form id="login-form" autocomplete="on">
                 <div class="form-group">
                     <label>Edificio</label>
-                    <select id="login-urb" required></select>
+                    <input type="text" id="login-urb" list="login-edificios" autocomplete="off" placeholder="Cargando edificios..." required>
+                    <datalist id="login-edificios"></datalist>
+                    <input type="hidden" id="login-urb-id">
+                    <small style="display:block;margin-top:4px;color:var(--text-secondary);font-size:0.72rem;">Escriba el nombre y haga clic en el edificio sugerido.</small>
                 </div>
                 <div class="form-group">
                     <label>Email</label>
-                    <input type="email" id="login-email" required>
+                    <input type="email" id="login-email" name="username" autocomplete="username" required>
                 </div>
                 <div class="form-group">
                     <label>Contraseña</label>
                     <div style="position:relative;">
-                        <input type="password" id="login-password" required>
+                        <input type="password" id="login-password" name="current-password" autocomplete="current-password" required>
                         <button type="button" onclick="window.NassauApp.togglePassVisibility('login-password')" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:1.2rem;" title="Ver contraseña">👁️</button>
                     </div>
+                    <small style="display:block;margin-top:4px;color:var(--text-secondary);font-size:0.72rem;">Si guardó la contraseña en este navegador, se completará automáticamente.</small>
                 </div>
                 <div class="form-group">
                     <div class="cf-turnstile" data-sitekey="0x4AAAAAAEkSbr2_4ud3eS1H"></div>
